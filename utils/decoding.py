@@ -4,10 +4,16 @@ import numpy as np
 
 def mask_from_splines(line, mask):
     """
+    Builds segmentation masks from spline coordinates
 
-    :param line:
-    :param mask:
-    :return:
+    :param line:    str
+                    spline coordinates for single line
+
+    :param mask:    np.ndarray HxW
+                    base mask filled with 0 and shaped as original image
+
+    :return:        np.ndarray HxW
+                    mask updated with segmented lines
     """
     line = line.split()
 
