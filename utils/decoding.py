@@ -8,7 +8,6 @@ def mask_from_splines(line, mask):
 
     :param line:    str
                     spline coordinates for single line
-
     :param mask:    np.ndarray HxW
                     base mask filled with 0 and shaped as original image
 
@@ -34,3 +33,23 @@ def mask_from_splines(line, mask):
         cv2.circle(mask, (x, y), 5, (1), -1)
 
     return mask
+
+
+def image_mask_overlay(img, mask):
+    """
+    Overlays masks over original img
+
+    :param img:     np.ndarray HxW
+                    original image
+    :param mask:    np.ndarray HxW
+                    mask
+
+    :return:        np.ndarray HxW
+                    original img with mask overlay
+    """
+    for i in range(mask.shape[0]):
+        for j in range(mask.shape[1]):
+            if mask[i, j] == 1:
+                img[i, j, :] = [255, 0, 255]
+
+    return img
