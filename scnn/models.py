@@ -20,14 +20,20 @@ class FastSCNN:
         gfe = self.bottleneck_block(gfe, n_filters=128, kernel_size=3, stride=1, expansion=6, n=3)
 
         # pyramid pooling
-        skip = [gfe]
+        concat = [gfe]
+        # TODO get output shape from last gfe automatically
+        w = 64
+        h = 32
 
         for bin_size in self.bin_sizes:
-            # TODO get output shape from last gfe automatically
-            w = 64
-            h = 32
             size = (w // bin_size, h // bin_size)
-            x = tf.keras.layers.AveragePooling2D(pool_size=size, strides=size)
+            ppl = tf.keras.layers.AveragePooling2D(pool_size=size, strides=size)(gfe)
+            ppl = tf.keras.layers.Conv2D(128, 3, 2, padding='same')(ppl)
+            ppl = tf.keras.layers.Lambda(lambda x: tf.image.resize(ppl, (w, h)))(ppl)
+            concat.append(ppl)
+        
+        ppl_concat = tf.keras.layers.concatenate(concat)
+        
 
 
     @staticmethod
