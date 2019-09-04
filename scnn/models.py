@@ -15,9 +15,9 @@ class FastSCNN:
         lds = self._conv_block_sc(lds, n_filters=64, kernel_size=3, stride=2)
 
         # global feature extractor
-        gfe = self.bottleneck_block(lds, n_filters=64, kernel_size=3, stride=2, expansion=6, n=3)
-        gfe = self.bottleneck_block(gfe, n_filters=96, kernel_size=3, stride=2, expansion=6, n=3)
-        gfe = self.bottleneck_block(gfe, n_filters=128, kernel_size=3, stride=1, expansion=6, n=3)
+        gfe = self._bottleneck_block(lds, n_filters=64, kernel_size=3, stride=2, expansion=6, n=3)
+        gfe = self._bottleneck_block(gfe, n_filters=96, kernel_size=3, stride=2, expansion=6, n=3)
+        gfe = self._bottleneck_block(gfe, n_filters=128, kernel_size=3, stride=1, expansion=6, n=3)
 
         # pyramid pooling
         concat = [gfe]
@@ -33,7 +33,7 @@ class FastSCNN:
             concat.append(ppl)
         
         ppl_concat = tf.keras.layers.concatenate(concat)
-        
+
 
 
     @staticmethod
@@ -73,7 +73,7 @@ class FastSCNN:
 
         return x
 
-    def bottleneck_block(self, inputs, n_filters, kernel_size, stride, expansion, n):
+    def _bottleneck_block(self, inputs, n_filters, kernel_size, stride, expansion, n):
         x = self._bottleneck(inputs, n_filters, kernel_size, expansion, stride)
 
         for _ in range(n):
