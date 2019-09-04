@@ -1,1 +1,1 @@
-from scnn import dataset
+from scnn import dataset, models
