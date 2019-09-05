@@ -2,7 +2,7 @@ import tensorflow as tf
 
 class FastSCNN:
 
-    def __init__(self, input_shape=(2048, 1024, 3), bin_sizes=[2, 4, 6, 8]):
+    def __init__(self, input_shape=(256, 256, 3), bin_sizes=[2, 4, 6, 8]):
         self.input_shape = input_shape
         self.bin_sizes = bin_sizes
         self._net = self._build()
@@ -23,9 +23,9 @@ class FastSCNN:
 
         # pyramid pooling
         concat = [gfe]
-        # TODO get output shape from last gfe automatically
-        w = 64
-        h = 32
+        gfe_shape = tf.keras.backend.int_shape(gfe)
+        w = gfe_shape[1]
+        h = gfe_shape[2]
 
         for bin_size in self.bin_sizes:
             size = (w // bin_size, h // bin_size)
@@ -105,3 +105,8 @@ class FastSCNN:
             x = self._bottleneck(x, n_filters, kernel_size, expansion, stride=1, skip=True)
         
         return x
+    
+    def compile(self):
+        optimizer = tf.keras.optimizers.SGD()
+        self._net.compile(loss='binary_crossentropy', optimizer=optimizer, metrics=['accuracy'])
+        return self._net.summary()
