@@ -2,11 +2,12 @@ import tensorflow as tf
 
 class FastSCNN:
 
-    def __init__(self, input_shape=(720, 1080, 3), bin_sizes=[2, 4, 6, 8]):
+    def __init__(self, mode, input_shape=(720, 1080, 3), bin_sizes=[2, 4, 6, 8]):
         self.input_shape = input_shape
         self.bin_sizes = bin_sizes
-        self._net = self._build()
         self._compiled = False
+        self._mode = mode
+        self._net = self._build()
 
     @staticmethod
     def _conv_block(inputs, n_filters, kernel_size, stride, relu=True):
@@ -103,15 +104,26 @@ class FastSCNN:
         classifier = tf.keras.layers.Dropout(0.3)(classifier)
         classifier = tf.keras.layers.UpSampling2D((8, 8))(classifier)
 
-        # pixel-wise binary classification
-        outputs = tf.keras.activations.sigmoid(classifier)
+        if self._mode == 'binary':
+            # pixel-wise binary classification
+            outputs = tf.keras.activations.sigmoid(classifier)
+        
+        else:
+            # pixel-wise multiclass classification
+            outputs = tf.keras.activations.softmax(classifier)
 
         return tf.keras.Model(inputs=inputs, outputs=outputs, name='fast_scnn')
     
     def compile(self, optimizer, metrics):
         """
         """
-        self._net.compile(loss='binary_crossentropy', optimizer=optimizer, metrics=metrics)
+        if self._mode == 'binary':
+            loss = tf.keras.losses.BinaryCrossentropy()
+
+        else:
+            loss = tf.keras.losses.CategoricalCrossentropy()
+
+        self._net.compile(loss=loss, optimizer=optimizer, metrics=metrics)
         self._compiled = True
     
     def train_on_batch(self, x, y):
