@@ -2,11 +2,10 @@ import tensorflow as tf
 
 class FastSCNN:
 
-    def __init__(self, input_shape=(256, 256, 3), bin_sizes=[2, 4, 6, 8]):
+    def __init__(self, input_shape=(720, 1080, 3), bin_sizes=[2, 4, 6, 8]):
         self.input_shape = input_shape
         self.bin_sizes = bin_sizes
         self._net = self._build()
-        # 295, 820, 3
 
     def _build(self):
         inputs = tf.keras.layers.Input(shape=self.input_shape, name='input')
@@ -38,12 +37,14 @@ class FastSCNN:
 
         # feature fusion module
         ff_hires = self._conv_block(lds, n_filters=1, kernel_size=1, stride=1, relu=False)
+        hires_shape = tf.keras.backend.int_shape(ff_hires)
 
         ff_lowres = tf.keras.layers.UpSampling2D((4, 4))(ppl_concat)
         ff_lowres = tf.keras.layers.DepthwiseConv2D(128, strides=1, depth_multiplier=1, padding='same')(ff_lowres)
         ff_lowres = tf.keras.layers.BatchNormalization()(ff_lowres)
         ff_lowres = tf.keras.activations.relu(ff_lowres)
         ff_lowres = tf.keras.layers.Conv2D(128, kernel_size=1, strides=1, padding='same', activation=None)(ff_lowres)
+        ff_lowres = tf.keras.layers.Reshape((hires_shape[1], hires_shape[2], 128))(ff_lowres)
 
         ff = tf.keras.layers.add([ff_hires, ff_lowres])
         ff = tf.keras.layers.BatchNormalization()(ff)
