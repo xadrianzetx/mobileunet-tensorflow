@@ -127,8 +127,13 @@ class FastSCNN:
         """
         Compiles Fast SCNN for either binary or multiclass tasks
 
-        :return:    tf.keras.Model
-                    compiled instance of Fast SCNN model
+        :param optimizer:   str || tf.keras.optimizers.Optimizer
+                            name of optimizer or optimizer instance.
+        :param metrics:     list
+                            List of metrics to be evaluated by the model during training and testing.
+
+        :return:            tf.keras.Model
+                            compiled instance of Fast SCNN model
         """
         if self._mode == 'binary':
             loss = tf.keras.losses.BinaryCrossentropy()
