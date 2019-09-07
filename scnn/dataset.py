@@ -51,15 +51,14 @@ class CULaneImage:
             img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
             height, width, _ = img.shape
 
-            # create empty mask and rebuild lines from cubic splines
+            # create empty mask and rebuild lines from splines
             mask_path = os.path.splitext(row['img_path'])[0]
             mask_path += '.lines.txt'
             mask_path = os.path.join(self._path, mask_path[1:]).replace('/', os.path.sep)
             mask = self._create_mask(size=(height, width), splines_path=mask_path)
 
             if self._augment:
-                # TODO
-                self._augment_image_mask(img, mask)
+                img, mask = self._augment_image_mask(img, mask)
 
             batch_x.append(img)
             batch_y.append(mask)
@@ -67,7 +66,8 @@ class CULaneImage:
         return batch_x, batch_y
 
     def _augment_image_mask(self, img, mask):
-        pass
+        # TODO
+        return img, mask
 
 
 class CULaneImageIterator(CULaneImage):
@@ -87,9 +87,12 @@ class CULaneImageIterator(CULaneImage):
 
     def __next__(self):
         """
-        Creates batch of image-mask pairs from
-        CULane dataset. Masks are build from cubic splines
-        annotations so that each pixel is encoded for semantic segmentation.
+        Creates batch of image-mask pairs from CULane dataset
+
+        Iterator version to use as standalone batch control
+
+        Masks are build from splines annotations so that each
+        pixel is encoded for semantic segmentation.
 
         :return:    batch_x: np.ndarray NxHxWxC
                     CULane dataset images
@@ -118,12 +121,25 @@ class CULaneImageGenerator(CULaneImage):
 
     def __call__(self):
         """
+        Creates batch of image-mask pairs from CULane dataset
+        
+        Generator version to use with tf.data.Dataset.from_generator()
+
+        Masks are build from splines annotations so that each
+        pixel is encoded for semantic segmentation.
+
+        :return:    img: np.ndarray HxWxC
+                    CULane dataset image
+                    mask: np.ndarray HxW
+                    binary mask for semantic segmentation
         """
         # reset idx and shuffle batch on epoch start
         self._lookup = self._lookup.sample(frac=1).reset_index(drop=True)
         self._idx = 0
 
         while self._idx < self._max_idx:
+            # get one img-mask pair
+            # batch is controlled by tf.data.Dataset
             obs = self._lookup.loc[self._idx]
             img, mask = self._get_batch(metadata=obs)
             self._idx += 1
@@ -138,13 +154,13 @@ class CULaneImageGenerator(CULaneImage):
         img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
         height, width, _ = img.shape
         
-        # create empty mask and rebuild lines from cubic splines
+        # create empty mask and rebuild lines from splines
         mask_path = os.path.splitext(metadata['img_path'])[0]
         mask_path += '.lines.txt'
         mask_path = os.path.join(self._path, mask_path[1:]).replace('/', os.path.sep)
         mask = self._create_mask(size=(height, width), splines_path=mask_path)
         
         if self._augment:
-            self._augment_image_mask(img, mask)
+            img, mask = self._augment_image_mask(img, mask)
         
         return img, mask
