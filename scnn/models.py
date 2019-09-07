@@ -5,7 +5,6 @@ class FastSCNN:
     def __init__(self, mode, input_shape=(720, 1080, 3), bin_sizes=(2, 4, 6, 8)):
         self.input_shape = input_shape
         self.bin_sizes = bin_sizes
-        self._compiled = False
         self._mode = mode
         self._net = self._build()
 
@@ -126,6 +125,10 @@ class FastSCNN:
     
     def compile(self, optimizer, metrics):
         """
+        Compiles Fast SCNN for either binary or multiclass tasks
+
+        :return:    tf.keras.Model
+                    compiled instance of Fast SCNN model
         """
         if self._mode == 'binary':
             loss = tf.keras.losses.BinaryCrossentropy()
@@ -134,10 +137,5 @@ class FastSCNN:
             loss = tf.keras.losses.CategoricalCrossentropy()
 
         self._net.compile(loss=loss, optimizer=optimizer, metrics=metrics)
-        self._compiled = True
-    
-    def train_on_batch(self, x, y):
-        pass
-
-    def save_model(self):
-        pass
+        
+        return self._net
