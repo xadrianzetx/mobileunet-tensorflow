@@ -74,6 +74,22 @@ class CULaneImage:
         if 'flip' in self._augmentations and np.random.choice([True, False]):
             # horizontal flip
             pair = [cv2.flip(x, 1) for x in pair]
+        
+        if 'brightness' in self._augmentations and np.random.choice([True, False]):
+            # brightness correction
+            # https://docs.opencv.org/3.4/Basic_Linear_Transform_Tutorial_gamma.png
+            gamma = np.random.uniform(0.67, 2.)
+            lookup = np.empty((1,256), np.uint8)
+
+            for i in range(256):
+                lookup[0,i] = np.clip(pow(i / 255.0, gamma) * 255.0, 0, 255)
+
+            pair[0] = cv2.LUT(pair[0], lookup)
+        
+        if 'scale' in self._augmentations:
+            # pair[0] / 255
+            # debug off so i can see other augmentations
+            pass
 
         return pair[0], pair[1]
 
