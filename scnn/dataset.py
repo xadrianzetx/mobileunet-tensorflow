@@ -13,7 +13,8 @@ class CULaneImage:
         self._batch_size = batch_size
         self._lookup_name = lookup_name
         self._augment = kwargs.get('augment', False)
-        self._augmentations = kwargs.get('augmentations', ('scale', 'flip', 'brightness'))
+        self._augmentations = kwargs.get('augmentations', ('flip', 'rotate', 'crop', 'brightness'))
+        self._scale = kwargs.get('scale', True)
         self._size = kwargs.get('size', (1080, 720))
         self._lookup = self._read_lookup()
 
@@ -69,11 +70,39 @@ class CULaneImage:
 
     def _augment_image_mask(self, img, mask):
         pair = [img, mask]
+        # size is flipped here (width, height)
         pair = [cv2.resize(x, self._size) for x in pair]
 
         if 'flip' in self._augmentations and np.random.choice([True, False]):
             # horizontal flip
             pair = [cv2.flip(x, 1) for x in pair]
+        
+        if 'rotate' in self._augmentations and np.random.choice([True, False]):
+            # randomly rotate img-mask pair
+            theta = np.random.randint(-5, 5)
+            height, width, _ = pair[0].shape
+            rot_matrix = cv2.getRotationMatrix2D((width / 2, height / 2), theta, 1)
+            pair = [cv2.warpAffine(x, rot_matrix, (width, height)) for x in pair]
+        
+        if 'crop' in self._augmentations and np.random.choice([True, False]):
+            # crop random part of img
+            # ratio is width // height
+            crop_ratio = self._size[0] // self._size[1]
+            crop_scale = np.random.uniform(0.99, 0.9999)
+
+            # cropped img has to be roughly same ratio as original img
+            crop_height = int(self._size[1] * crop_scale)
+            crop_width = crop_height * crop_ratio
+
+            # get random start point
+            max_x = self._size[1] - crop_width
+            max_y = self._size[0] - crop_height
+            x = np.random.randint(0, max_x)
+            y = np.random.randint(0, max_y)
+
+            # crop image and resize to required size
+            pair = [img[y:y + crop_height, x:x + crop_width] for img in pair]
+            pair = [cv2.resize(x, self._size) for x in pair]
         
         if 'brightness' in self._augmentations and np.random.choice([True, False]):
             # brightness correction
@@ -86,7 +115,7 @@ class CULaneImage:
 
             pair[0] = cv2.LUT(pair[0], lookup)
         
-        if 'scale' in self._augmentations:
+        if self._scale:
             # pair[0] / 255
             # debug off so i can see other augmentations
             pass
@@ -96,8 +125,8 @@ class CULaneImage:
 
 class CULaneImageIterator(CULaneImage):
 
-    def __init__(self, path, batch_size, lookup_name, augment=False):
-        CULaneImage.__init__(self, path, batch_size, lookup_name, augment=augment)
+    def __init__(self, path, batch_size, lookup_name, **kwargs):
+        CULaneImage.__init__(self, path, batch_size, lookup_name, **kwargs)
         self._max_idx = self._lookup.shape[0]
         self._idx = 0
 
@@ -138,8 +167,8 @@ class CULaneImageIterator(CULaneImage):
 
 class CULaneImageGenerator(CULaneImage):
 
-    def __init__(self, path, batch_size, lookup_name, augment=False):
-        CULaneImage.__init__(self, path, batch_size, lookup_name, augment=augment)
+    def __init__(self, path, batch_size, lookup_name, **kwargs):
+        CULaneImage.__init__(self, path, batch_size, lookup_name, **kwargs)
         self._max_idx = self._lookup.shape[0]
         self._idx = 0
 
