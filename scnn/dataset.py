@@ -8,11 +8,13 @@ from utils.decoding import mask_from_splines
 
 class CULaneImage:
 
-    def __init__(self, path, batch_size, lookup_name, augment=False):
+    def __init__(self, path, batch_size, lookup_name, **kwargs):
         self._path = path
         self._batch_size = batch_size
         self._lookup_name = lookup_name
-        self._augment = augment
+        self._augment = kwargs.get('augument', False)
+        self._augmentations = kwargs.get('augmentations', ('scale', 'flip', 'brightness'))
+        self._size = kwargs.get('size', (720, 1080))
         self._lookup = self._read_lookup()
 
     @staticmethod
@@ -66,8 +68,10 @@ class CULaneImage:
         return batch_x, batch_y
 
     def _augment_image_mask(self, img, mask):
-        # TODO
-        return img, mask
+        pair = [img, mask]
+        pair = [cv2.resize(x, self._size) for x in pair]
+
+        return pair[0], pair[1]
 
 
 class CULaneImageIterator(CULaneImage):
