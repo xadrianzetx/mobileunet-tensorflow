@@ -13,6 +13,7 @@ class CULaneImage:
         self._batch_size = batch_size
         self._lookup_name = lookup_name
         self._augment = kwargs.get('augment', False)
+        self._augment_proba = kwargs.get('augment_proba', 0.4)
         self._augmentations = kwargs.get('augmentations', ('flip', 'rotate', 'crop', 'brightness'))
         self._scale = kwargs.get('scale', True)
         self._size = kwargs.get('size', (1080, 720))
@@ -70,21 +71,23 @@ class CULaneImage:
 
     def _augment_image_mask(self, img, mask):
         pair = [img, mask]
+
         # size is flipped here (width, height)
         pair = [cv2.resize(x, self._size) for x in pair]
+        p = [self._augment_proba, 1 - self._augment_proba]
 
-        if 'flip' in self._augmentations and np.random.choice([True, False]):
+        if 'flip' in self._augmentations and np.random.choice([True, False], p=p):
             # horizontal flip
             pair = [cv2.flip(x, 1) for x in pair]
         
-        if 'rotate' in self._augmentations and np.random.choice([True, False]):
+        if 'rotate' in self._augmentations and np.random.choice([True, False], p=p):
             # randomly rotate img-mask pair
             theta = np.random.randint(-5, 5)
             height, width, _ = pair[0].shape
             rot_matrix = cv2.getRotationMatrix2D((width / 2, height / 2), theta, 1)
             pair = [cv2.warpAffine(x, rot_matrix, (width, height)) for x in pair]
         
-        if 'crop' in self._augmentations and np.random.choice([True, False]):
+        if 'crop' in self._augmentations and np.random.choice([True, False], p=p):
             # crop random part of img
             # ratio is width // height
             crop_ratio = self._size[0] // self._size[1]
@@ -104,7 +107,7 @@ class CULaneImage:
             pair = [img[y:y + crop_height, x:x + crop_width] for img in pair]
             pair = [cv2.resize(x, self._size) for x in pair]
         
-        if 'brightness' in self._augmentations and np.random.choice([True, False]):
+        if 'brightness' in self._augmentations and np.random.choice([True, False], p=p):
             # brightness correction
             # https://docs.opencv.org/3.4/Basic_Linear_Transform_Tutorial_gamma.png
             gamma = np.random.uniform(0.67, 2.)
