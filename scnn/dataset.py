@@ -12,15 +12,15 @@ class CULaneImage:
         self._path = path
         self._batch_size = batch_size
         self._lookup_name = lookup_name
-        self._augment = kwargs.get('augument', False)
+        self._augment = kwargs.get('augment', False)
         self._augmentations = kwargs.get('augmentations', ('scale', 'flip', 'brightness'))
-        self._size = kwargs.get('size', (720, 1080))
+        self._size = kwargs.get('size', (1080, 720))
         self._lookup = self._read_lookup()
 
     @staticmethod
     def _create_mask(size, splines_path):
         # initialize empty mask
-        mask = np.zeros(size, dtype=int)
+        mask = np.zeros(size, dtype=np.uint8)
 
         with open(splines_path, 'r') as file:
             for line in file:
@@ -70,6 +70,10 @@ class CULaneImage:
     def _augment_image_mask(self, img, mask):
         pair = [img, mask]
         pair = [cv2.resize(x, self._size) for x in pair]
+
+        if 'flip' in self._augmentations and np.random.choice([True, False]):
+            # horizontal flip
+            pair = [cv2.flip(x, 1) for x in pair]
 
         return pair[0], pair[1]
 
