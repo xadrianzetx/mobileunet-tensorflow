@@ -1,0 +1,4 @@
+pandas
+Pillow
+opencv-python==3.4.0.12
+tensorflow==2.0.0rc0
