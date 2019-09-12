@@ -8,7 +8,7 @@ from utils.decoding import mask_from_splines
 
 class CULaneImage:
 
-    def __init__(self, path, batch_size, lookup_name, **kwargs):
+    def __init__(self, path, batch_size, lookup_name, size, **kwargs):
         self._path = path
         self._batch_size = batch_size
         self._lookup_name = lookup_name
@@ -16,7 +16,7 @@ class CULaneImage:
         self._augment_proba = kwargs.get('augment_proba', 0.4)
         self._augmentations = kwargs.get('augmentations', ('flip', 'rotate', 'crop', 'brightness'))
         self._scale = kwargs.get('scale', True)
-        self._size = kwargs.get('size', (1080, 720))
+        self._size = (size[1], size[0])
         self._lookup = self._read_lookup()
 
     @staticmethod
