@@ -10,7 +10,7 @@ class FastSCNN:
 
     @staticmethod
     def _conv_block(inputs, n_filters, kernel_size, strides, relu=True):
-        x = tf.keras.layers.Conv2D(n_filters, kernel_size, strides)(inputs)
+        x = tf.keras.layers.Conv2D(n_filters, kernel_size, strides, padding='same')(inputs)
         x = tf.keras.layers.BatchNormalization()(x)
 
         if relu:
@@ -101,7 +101,7 @@ class FastSCNN:
         ff_lowres = tf.keras.layers.UpSampling2D((4, 4))(ppl)
         ff_lowres = self._conv_block_dc(ff_lowres, kernel_size=3, strides=1)
         ff_lowres = tf.keras.layers.Conv2D(128, kernel_size=1, strides=1, padding='same', activation=None)(ff_lowres)
-        ff_lowres = tf.keras.layers.Reshape((hires_shape[1], hires_shape[2], 128))(ff_lowres)
+        ff_lowres = tf.keras.layers.Lambda(lambda x: tf.image.resize(x, (hires_shape[1], hires_shape[2])))(ff_lowres)
 
         ff = tf.keras.layers.add([ff_hires, ff_lowres])
         ff = tf.keras.layers.BatchNormalization()(ff)
@@ -110,7 +110,7 @@ class FastSCNN:
         # classifier
         classifier = self._conv_block_sc(ff, n_filters=128, kernel_size=3, strides=1)
         classifier = self._conv_block_sc(classifier, n_filters=128, kernel_size=3, strides=1)
-        classifier = self._conv_block(classifier, n_filters=19, kernel_size=1, strides=1, relu=False)
+        classifier = self._conv_block(classifier, n_filters=1, kernel_size=1, strides=1, relu=False)
         classifier = tf.keras.layers.UpSampling2D((8, 8))(classifier)
 
         if self._mode == 'binary':
