@@ -64,6 +64,7 @@ class CULaneImage:
             if self._augment:
                 img, mask = self._augment_image_mask(img, mask)
 
+            mask = np.expand_dims(mask, axis=-1)
             batch_x.append(img)
             batch_y.append(mask)
         
@@ -119,8 +120,7 @@ class CULaneImage:
             pair[0] = cv2.LUT(pair[0], lookup)
         
         if self._scale:
-            # pair[0] / 255
-            # debug off so i can see other augmentations
+            # TODO
             pass
 
         return pair[0], pair[1]
@@ -194,29 +194,13 @@ class CULaneImageGenerator(CULaneImage):
         self._idx = 0
 
         while self._idx < self._max_idx:
-            # get one img-mask pair
-            # batch is controlled by tf.data.Dataset
-            obs = self._lookup.loc[self._idx]
-            img, mask = self._get_batch(metadata=obs)
-            self._idx += 1
+            # get batch of img-mask pairs
+            # generator StopIteration is controlled by tf.data.Dataset
+            batch = self._lookup.loc[self._idx:self._idx + self._batch_size - 1]
+            self._idx += self._batch_size
 
-            yield img, mask
-    
-    def _get_batch(self, metadata):
-        # load image and switch color channels
-        img_path = metadata['img_path'].replace('/', os.path.sep)
-        img = Image.open(os.path.join(self._path, img_path[1:]))
-        img = np.array(img)
-        img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
-        height, width, _ = img.shape
-        
-        # create empty mask and rebuild lines from splines
-        mask_path = os.path.splitext(metadata['img_path'])[0]
-        mask_path += '.lines.txt'
-        mask_path = os.path.join(self._path, mask_path[1:]).replace('/', os.path.sep)
-        mask = self._create_mask(size=(height, width), splines_path=mask_path)
-        
-        if self._augment:
-            img, mask = self._augment_image_mask(img, mask)
-        
-        return img, mask
+            batch_x, batch_y = self._get_batch(metadata=batch)
+            batch_x, batch_y = np.array(batch_x), np.array(batch_y)
+            
+            if batch_x.shape[0] == self._batch_size:
+              yield batch_x, batch_y
