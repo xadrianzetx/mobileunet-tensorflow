@@ -1,1 +1,1 @@
-from scnn import dataset, models
+from scnn import dataset, models, losses
