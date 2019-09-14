@@ -2,11 +2,9 @@ import tensorflow as tf
 
 class FastSCNN:
 
-    def __init__(self, mode, input_shape=(720, 1080, 3), bin_sizes=(2, 4, 6, 8)):
+    def __init__(self, input_shape=(720, 1080, 3), bin_sizes=(2, 4, 6, 8)):
         self.input_shape = input_shape
         self.bin_sizes = bin_sizes
-        self._mode = mode
-        self._net = self._build()
 
     @staticmethod
     def _conv_block(inputs, n_filters, kernel_size, strides, relu=True):
@@ -78,7 +76,13 @@ class FastSCNN:
         
         return tf.keras.layers.concatenate(concat_tensors)
     
-    def _build(self):
+    def build(self):
+        """
+        Compiles Fast SCNN
+
+        :return:    tf.keras.Model
+                    Compiled Fast-SCNN
+        """
         inputs = tf.keras.layers.Input(shape=self.input_shape, name='input')
 
         # learning to downsample module
@@ -122,25 +126,3 @@ class FastSCNN:
             outputs = tf.keras.activations.softmax(classifier)
 
         return tf.keras.Model(inputs=inputs, outputs=outputs, name='fast_scnn')
-    
-    def compile(self, optimizer, metrics):
-        """
-        Compiles Fast SCNN for either binary or multiclass tasks
-
-        :param optimizer:   str || tf.keras.optimizers.Optimizer
-                            name of optimizer or optimizer instance.
-        :param metrics:     list
-                            List of metrics to be evaluated by the model during training and testing.
-
-        :return:            tf.keras.Model
-                            compiled instance of Fast SCNN model
-        """
-        if self._mode == 'binary':
-            loss = tf.keras.losses.BinaryCrossentropy()
-
-        else:
-            loss = tf.keras.losses.CategoricalCrossentropy()
-
-        self._net.compile(loss=loss, optimizer=optimizer, metrics=metrics)
-        
-        return self._net
