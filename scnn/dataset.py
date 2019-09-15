@@ -118,10 +118,6 @@ class CULaneImage:
                 lookup[0,i] = np.clip(pow(i / 255.0, gamma) * 255.0, 0, 255)
 
             pair[0] = cv2.LUT(pair[0], lookup)
-        
-        if self._scale:
-            # TODO
-            pass
 
         return pair[0], pair[1]
 
@@ -163,9 +159,15 @@ class CULaneImageIterator(CULaneImage):
         # select subset of data for batch
         batch = self._lookup.loc[self._idx:self._idx + self._batch_size - 1]
         self._idx += self._batch_size
-        batch_x, batch_y = self._get_batch(metadata=batch)      
 
-        return np.array(batch_x), np.array(batch_y)
+        batch_x, batch_y = self._get_batch(metadata=batch)
+        batch_x = np.array(batch_x).astype(float)
+        batch_y = np.array(batch_y).astype(float)
+
+        if self._scale:
+            batch_x *= (1 / 255)
+
+        return batch_x, batch_y
 
 
 class CULaneImageGenerator(CULaneImage):
@@ -200,7 +202,11 @@ class CULaneImageGenerator(CULaneImage):
             self._idx += self._batch_size
 
             batch_x, batch_y = self._get_batch(metadata=batch)
-            batch_x, batch_y = np.array(batch_x), np.array(batch_y)
+            batch_x = np.array(batch_x).astype(float)
+            batch_y = np.array(batch_y).astype(float)
+
+            if self._scale:
+                batch_x *= (1 / 255)
             
             if batch_x.shape[0] == self._batch_size:
               yield batch_x, batch_y
