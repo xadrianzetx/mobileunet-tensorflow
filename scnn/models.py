@@ -2,9 +2,11 @@ import tensorflow as tf
 
 class FastSCNN:
 
-    def __init__(self, input_shape=(720, 1080, 3), bin_sizes=(2, 4, 6, 8)):
+    def __init__(self, mode, input_shape=(720, 1080, 3), bin_sizes=(2, 4, 6, 8), n_classes):
         self.input_shape = input_shape
         self.bin_sizes = bin_sizes
+        self._mode = mode
+        self._n_classes = n_classes
 
     @staticmethod
     def _conv_block(inputs, n_filters, kernel_size, strides, relu=True):
@@ -81,7 +83,7 @@ class FastSCNN:
         Compiles Fast SCNN
 
         :return:    tf.keras.Model
-                    Compiled Fast-SCNN
+                    Ready to compile Fast-SCNN
         """
         inputs = tf.keras.layers.Input(shape=self.input_shape, name='input')
 
@@ -114,7 +116,7 @@ class FastSCNN:
         # classifier
         classifier = self._conv_block_sc(ff, n_filters=128, kernel_size=3, strides=1)
         classifier = self._conv_block_sc(classifier, n_filters=128, kernel_size=3, strides=1)
-        classifier = self._conv_block(classifier, n_filters=1, kernel_size=1, strides=1, relu=False)
+        classifier = self._conv_block(classifier, n_filters=self._n_classes, kernel_size=1, strides=1, relu=False)
         classifier = tf.keras.layers.UpSampling2D((8, 8))(classifier)
 
         if self._mode == 'binary':
@@ -126,3 +128,72 @@ class FastSCNN:
             outputs = tf.keras.activations.softmax(classifier)
 
         return tf.keras.Model(inputs=inputs, outputs=outputs, name='fast_scnn')
+
+
+class MobileUNet:
+
+    def __init__(self, mode, input_shape, n_classes=1, train_encoder=False):
+        self._input_shape = input_shape
+        self._trainable = train_encoder
+        self._n_classes = n_classes
+        self._mode = mode
+    
+    @staticmethod
+    def _upconv(inputs, n_filters, kernel_size, strides):
+        x = tf.keras.layers.Conv2DTranspose(n_filters, kernel_size, strides, padding='same', use_bias=False)(inputs)
+        x = tf.keras.layers.BatchNormalization()(x)
+        x = tf.keras.activations.relu(x)
+
+        return x
+    
+    def build(self):
+        """
+        Builds U-Net encoder-decoder model with
+        pre trainded MobileNetV2 encoder
+
+        Encoder is using ImageNet weights and can be
+        frozen or trained with decoder
+
+        :return:    tf.keras.models.Model
+                    Ready to compile MobileUnet
+        """
+        base = tf.keras.applications.MobileNetV2(input_shape=self._input_shape, include_top=False, weights='imagenet')
+
+        if not self._trainable:
+            base.trainable = False
+        
+        # upsample and concat with block 13
+        base_out = base.get_layer('block_16_project')
+        skip_b13 = base.get_layer('block_13_expand_relu')
+        n_filters = tf.keras.backend.int_shape(skip_b13.output)[-1]
+        padding_b13 = tf.keras.layers.ZeroPadding2D()(skip_b13.output)
+        x = self._upconv(base_out.output, n_filters=n_filters, kernel_size=3, strides=2)
+        x = tf.keras.layers.Concatenate()([x, skip_b13.output])
+
+        # upsample and concat with block 6
+        skip_b6 = base.get_layer('block_6_expand_relu')
+        n_filters = tf.keras.backend.int_shape(skip_b6.output)[-1]
+        x = self._upconv(x, n_filters=n_filters, kernel_size=3, strides=2)
+        x = tf.keras.layers.Concatenate()([x, skip_b6.output])
+
+        # upsample and concat with block 3
+        skip_b3 = base.get_layer('block_3_expand_relu')
+        n_filters = tf.keras.backend.int_shape(skip_b3.output)[-1]
+        x = self._upconv(x, n_filters=n_filters, kernel_size=3, strides=2)
+        x = tf.keras.layers.Concatenate()([x, skip_b3.output])
+
+        # upsample and concat with block 1
+        skip_b1 = base.get_layer('block_1_expand_relu')
+        n_filters = tf.keras.backend.int_shape(skip_b1.output)[-1]
+        x = self._upconv(x, n_filters=n_filters, kernel_size=3, strides=2)
+        x = tf.keras.layers.Concatenate()([x, skip_b1.output])
+
+        if self._mode == 'binary':
+            x = tf.keras.layers.Conv2DTranspose(filters=1, kernel_size=3, strides=2, padding='same')(x)
+            out = tf.keras.activations.sigmoid(x)
+        
+        else:
+            x = tf.keras.layers.Conv2DTranspose(filters=self._n_classes, kernel_size=3, strides=2, padding='same')(x)
+            out = tf.keras.activations.softmax(x)
+        
+        return tf.keras.models.Model(inputs=base.input, outputs=out)
