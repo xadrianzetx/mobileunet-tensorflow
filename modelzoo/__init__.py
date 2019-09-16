@@ -1,1 +1,1 @@
-from scnn import dataset, models, losses
+from modelzoo import models, losses
