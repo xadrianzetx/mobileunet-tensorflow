@@ -64,7 +64,10 @@ class CULaneImage:
             if self._augment:
                 img, mask = self._augment_image_mask(img, mask)
 
+            img = cv2.resize(img, self._size)
+            mask = cv2.resize(mask, self._size)
             mask = np.expand_dims(mask, axis=-1)
+
             batch_x.append(img)
             batch_y.append(mask)
         
@@ -72,9 +75,6 @@ class CULaneImage:
 
     def _augment_image_mask(self, img, mask):
         pair = [img, mask]
-
-        # size is flipped here (width, height)
-        pair = [cv2.resize(x, self._size) for x in pair]
         p = [self._augment_proba, 1 - self._augment_proba]
 
         if 'flip' in self._augmentations and np.random.choice([True, False], p=p):
