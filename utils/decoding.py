@@ -1,3 +1,4 @@
+import os
 import cv2
 import numpy as np
 
@@ -53,3 +54,41 @@ def image_mask_overlay(img, mask):
                 img[i, j, :] = [255, 0, 255]
 
     return img
+
+
+def extract_frames(src, dst, n=3):
+    """
+    Extracts every nth frame from video as .jpg
+
+    :param src: str
+                path to video source
+    :param dst: str
+                path to save directory
+    :param n:   int
+                every nth frame will be saved    
+
+    :return:    void
+    """
+    frame_count = 0
+    name = os.path.splitext(os.path.basename(src))[0]
+
+    # init capture
+    cap = cv2.VideoCapture(src)
+
+    while cap.isOpened():
+        fetched, frame = cap.read()
+
+        if not fetched:
+            # no frames has been grabbed
+            break
+
+        if frame_count % n == 0:
+            # save every nth frame
+            frame_name = '{}_{}.jpg'.format(name, frame_count)
+            output_path = os.path.join(dst.replace('/', os.path.sep), frame_name)
+            cv2.imwrite(output_path, frame)
+        
+        frame_count += 1
+
+    cap.release()
+    cv2.destroyAllWindows()
