@@ -1,1 +1,1 @@
-from modelzoo import models, losses
+from modelzoo import models, losses, metrics
