@@ -31,9 +31,9 @@ class FocalTverskyLoss:
         y_pred = K.flatten(y_pred)
         
         # true pos, false pos, false neg
-        tp = K.sum((y_pred * y_true))
-        fp = K.sum(((1 - y_true) * y_pred))
-        fn = K.sum((y_true * (1 - y_pred)))
+        tp = K.sum(y_pred * y_true)
+        fp = K.sum((1 - y_true) * y_pred)
+        fn = K.sum(y_true * (1 - y_pred))
         
         tversky = (tp + self.smooth) / (tp + self.alpha * fp + self.beta * fn + self.smooth)
         focal_tversky = K.pow((1 - tversky), self.gamma)
