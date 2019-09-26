@@ -1,5 +1,6 @@
 import tensorflow as tf
 
+
 class FastSCNN:
 
     def __init__(self, mode, input_shape=(720, 1080, 3), bin_sizes=(2, 4, 6, 8), n_classes=1):
@@ -158,6 +159,7 @@ class MobileUNet:
         x = self._conv_ds(inputs, n_filters=n_filters, kernel_size=kernel_size, strides=strides)
         x = self._conv_ds(x, n_filters=n_filters, kernel_size=kernel_size, strides=strides)
 
+        # depthwise conv skip connection
         skip = tf.keras.layers.SeparableConv2D(n_filters, kernel_size=kernel_size, strides=strides, padding='same')(x)
         skip = tf.keras.layers.BatchNormalization()(skip)
         skip = tf.keras.activations.relu(skip)
