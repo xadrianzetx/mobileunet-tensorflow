@@ -166,7 +166,6 @@ class MobileUNet:
         base_out = base.get_layer('block_16_project')
         skip_b13 = base.get_layer('block_13_expand_relu')
         n_filters = tf.keras.backend.int_shape(skip_b13.output)[-1]
-        padding_b13 = tf.keras.layers.ZeroPadding2D()(skip_b13.output)
         x = self._upconv(base_out.output, n_filters=n_filters, kernel_size=3, strides=2)
         x = tf.keras.layers.Concatenate()([x, skip_b13.output])
 
