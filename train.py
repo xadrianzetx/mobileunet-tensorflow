@@ -1,45 +1,109 @@
+import config
+import argparse
 import tensorflow as tf
-from scnn.dataset import CULaneImageGenerator
-from scnn.models import FastSCNN
+from utils.dataset import CULaneImageGenerator
+from modelzoo.models import MobileUNet
+from modelzoo.losses import focal_tversky_loss
+from modelzoo.metrics import dice_coefficient
 
 
-# make config out of those
-LIST_PATH = ''
-TRAIN_LIST = ''
-VALID_LIST = ''
+def arguments():
+    parser = argparse.ArgumentParser()
 
-BATCH_SIZE = 10
-STEPS_PER_EPOCH = 100
-VALIDATION_STEPS = 30
-IMAGE_SIZE = (720, 1080, 3)
-MASK_SIZE = (720, 1080)
+    parser.add_argument('--mode', type=str, default='debug')
+    parser.add_argument('--data-train', type=str, default=config.TRAIN_PATH)
+    parser.add_argument('--data-valid', type=str, default=config.VALID_PATH)
+    parser.add_argument('--epochs', type=int, default=config.EPOCHS)
 
-train_g = CULaneImageGenerator(path=LIST_PATH, batch_size=BATCH_SIZE, lookup_name=TRAIN_LIST, augment=True)
-valid_g = CULaneImageGenerator(path=LIST_PATH, batch_size=BATCH_SIZE, lookup_name=VALID_LIST, augment=False)
+    return parser.parse_args()
 
-train_gen = tf.data.Dataset.from_generator(train_g, output_types=(tf.int32, tf.int32), output_shapes=(IMAGE_SIZE, MASK_SIZE))
-valid_gen = tf.data.Dataset.from_generator(valid_g, output_types=(tf.int32, tf.int32), output_shapes=(IMAGE_SIZE, MASK_SIZE))
 
-# optimizer same as in paper
-optimizer = tf.keras.optimizers.SGD()
-metrics = ['accuracy']
+def train():
+    args = arguments()
+    
+    # model instance
+    model = MobileUNet(mode='binary', input_shape=config.IMG_SIZE, train_encoder=config.TRAIN_ENCODER).build()
+    loss = focal_tversky_loss(alpha=config.LOSS_ALPHA, beta=config.LOSS_BETA, gamma=config.LOSS_GAMMA)
+    optimizer = tf.keras.optimizers.Adam()
+    metrics = [tf.keras.metrics.MeanIoU(num_classes=2), tf.keras.metrics.Precision(), dice_coefficient()]
+    model.compile(optimizer=optimizer, loss=loss, metrics=metrics)
 
-# model instance
-m = FastSCNN(mode='binary', input_shape=IMAGE_SIZE)
-model = m.compile(optimizer=optimizer, metrics=metrics)
+    # callbacks
+    tensorboard = tf.keras.callbacks.TensorBoard(log_dir=config.LOGDIR)
+    model_checkpoint = tf.keras.callbacks.ModelCheckpoint(filepath=config.SAVE_PATH)
+    reduce_lr = tf.keras.callbacks.ReduceLROnPlateau(factor=0.2, patience=5, min_lr=0.0001)
 
-# callbacks - TODO
-callbacks = None
+    if args.mode = 'debug':
+        train_g = CULaneImageGenerator(
+            path=args.data-train,
+            lookup_name=config.DEBUG_TRAIN_LOOKUP,
+            batch_size=config.DEBUG_BATCH_SIZE,
+            size=config.IMG_SIZE,
+            augment=True,
+            augmentations=config.AUGMENTATIONS
+        )
 
-# oh and implement debug mode for Google AI platform
+        valid_g = CULaneImageGenerator(
+            path=args.data-train,
+            lookup_name=config.DEBUG_TRAIN_LOOKUP,
+            batch_size=config.DEBUG_BATCH_SIZE,
+            size=config.IMG_SIZE,
+            augment=False
+        )
 
-history = model.fit_generator(
-    train_gen,
-    steps_per_epoch=STEPS_PER_EPOCH,
-    epochs=1,
-    verbose=1,
-    callbacks=None,
-    validation_data=valid_gen,
-    validation_steps=VALIDATION_STEPS,
-    shuffle=Fale
-)
+        train_generator = tf.data.Dataset.from_generator(
+            generator=train_g,
+            output_types=(tf.float16, tf.float16),
+            output_shapes=(config.GEN_IMG_OUT_SHAPE, config.GRN_MASK_OUT_SHAPE)
+        )
+
+        valid_generator = tf.data.Dataset.from_generator(
+            generator=valid_g,
+            output_types=(tf.float16, tf.float16),
+            output_shapes=(config.GEN_IMG_OUT_SHAPE, config.GRN_MASK_OUT_SHAPE)
+        )
+
+    else:
+        train_g = CULaneImageGenerator(
+            path=args.data-train,
+            lookup_name=config.TRAIN_LOOKUP,
+            batch_size=config.BATCH_SIZE,
+            size=config.IMG_SIZE,
+            augment=True,
+            augmentations=config.AUGMENTATIONS
+        )
+
+        valid_g = CULaneImageGenerator(
+            path=args.data-train,
+            lookup_name=config.VALID_LOOKUP,
+            batch_size=config.BATCH_SIZE,
+            size=config.IMG_SIZE,
+            augment=False
+        )
+
+        train_generator = tf.data.Dataset.from_generator(
+            generator=train_g,
+            output_types=(tf.float16, tf.float16),
+            output_shapes=(config.GEN_IMG_OUT_SHAPE, config.GEN_MASK_OUT_SHAPE)
+        )
+
+        valid_generator = tf.data.Dataset.from_generator(
+            generator=valid_g,
+            output_types=(tf.float16, tf.float16),
+            output_shapes=(config.GEN_IMG_OUT_SHAPE, config.GEN_MASK_OUT_SHAPE)
+        )
+    
+    # train model
+    history = model.fit_generator(
+            train_generator,
+            epochs=args.epochs,
+            callbacks=[tensorboard, model_checkpoint, reduce_lr],
+            validation_data=valid_generator,
+            shuffle=False
+        )
+    
+    # TODO - model and history save
+
+
+if __name__ == "__main__":
+    pass
