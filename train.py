@@ -20,6 +20,14 @@ def arguments():
     return parser.parse_args()
 
 
+def jsonify_history(history):
+    # converts history.history to serializable object
+    for key in history.keys():
+        history[key] = [str(x) for x in history[key]]
+    
+    return history
+
+
 def train():
     args = arguments()
     
@@ -112,7 +120,7 @@ def train():
     model.save('{}.h5'.format(args.model-name))
 
     with open('{}_logs.json'.format(args.model-name), 'w') as file:
-        log = {args.model-name: history}
+        log = jsonify_history(history.history)
         json.dump(log, file, indent=4)
 
 
