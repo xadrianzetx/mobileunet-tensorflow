@@ -244,12 +244,12 @@ class MobileUNet:
 
         if self._mode == 'binary':
             x = tf.keras.layers.UpSampling2D((2, 2))(x)
-            x = tf.keras.layers.SeparableConv2D(n_filters=1, kernel_size=3, strides=1, padding='same')(x)
+            x = tf.keras.layers.SeparableConv2D(1, kernel_size=3, strides=1, padding='same')(x)
             out = tf.keras.activations.sigmoid(x)
         
         else:
             x = tf.keras.layers.UpSampling2D((2, 2))(x)
-            x = tf.keras.layers.SeparableConv2D(n_filters=self._n_classes, kernel_size=3, strides=1, padding='same')(x)
+            x = tf.keras.layers.SeparableConv2D(self._n_classes, kernel_size=3, strides=1, padding='same')(x)
             out = tf.keras.activations.softmax(x)
         
         return tf.keras.models.Model(inputs=base.input, outputs=out)

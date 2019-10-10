@@ -39,7 +39,7 @@ def train():
     model_checkpoint = tf.keras.callbacks.ModelCheckpoint(filepath=config.SAVE_PATH)
     reduce_lr = tf.keras.callbacks.ReduceLROnPlateau(factor=0.2, patience=5, min_lr=0.0001)
 
-    if args['mode'] = 'debug':
+    if args['mode'] == 'debug':
         # sets both generators to output batch from debug list of images
         # rest of the config is the same as training mode
         print('#' * 20, args['mode'])
