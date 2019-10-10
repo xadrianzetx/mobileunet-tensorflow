@@ -1,3 +1,4 @@
+import os
 import json
 import config
 import argparse
@@ -6,18 +7,6 @@ from utils.dataset import CULaneImageGenerator
 from modelzoo.models import MobileUNet
 from modelzoo.losses import focal_tversky_loss
 from modelzoo.metrics import dice_coefficient
-
-
-def arguments():
-    parser = argparse.ArgumentParser()
-
-    parser.add_argument('--mode', type=str, default='train')
-    parser.add_argument('--data-train', type=str, default=config.TRAIN_PATH)
-    parser.add_argument('--data-valid', type=str, default=config.VALID_PATH)
-    parser.add_argument('--epochs', type=int, default=config.EPOCHS)
-    parser.add_argument('--model-name', type=str, default='model')
-
-    return parser.parse_args()
 
 
 def jsonify_history(history):
@@ -29,12 +18,18 @@ def jsonify_history(history):
 
 
 def train():
-    args = arguments()
+    args = {
+        # passed by docker run -e
+        'mode': os.environ['--mode'],
+        'data-train': os.environ['--data-train'],
+        'epochs': os.environ['--epochs'],
+        'model-name': os.environ['--model-name']
+    }
     
     # model instance
     model = MobileUNet(mode='binary', input_shape=config.IMG_SIZE, train_encoder=config.TRAIN_ENCODER).build()
     loss = focal_tversky_loss(alpha=config.LOSS_ALPHA, beta=config.LOSS_BETA, gamma=config.LOSS_GAMMA)
-    optimizer = tf.keras.optimizers.Adam()
+    optimizer = tf.keras.optimizers.Adam(learning_rate=config.LR)
 
     metrics = [tf.keras.metrics.MeanIoU(num_classes=2), tf.keras.metrics.Precision(), dice_coefficient()]
     model.compile(optimizer=optimizer, loss=loss, metrics=metrics)
@@ -44,11 +39,13 @@ def train():
     model_checkpoint = tf.keras.callbacks.ModelCheckpoint(filepath=config.SAVE_PATH)
     reduce_lr = tf.keras.callbacks.ReduceLROnPlateau(factor=0.2, patience=5, min_lr=0.0001)
 
-    if args.mode = 'debug':
+    if args['mode'] = 'debug':
         # sets both generators to output batch from debug list of images
         # rest of the config is the same as training mode
+        print('#' * 20, args['mode'])
+
         train_g = CULaneImageGenerator(
-            path=args.data-train,
+            path=args['data-train'],
             lookup_name=config.DEBUG_TRAIN_LOOKUP,
             batch_size=config.DEBUG_BATCH_SIZE,
             size=config.IMG_SIZE,
@@ -57,7 +54,7 @@ def train():
         )
 
         valid_g = CULaneImageGenerator(
-            path=args.data-train,
+            path=args['data-train'],
             lookup_name=config.DEBUG_TRAIN_LOOKUP,
             batch_size=config.DEBUG_BATCH_SIZE,
             size=config.IMG_SIZE,
@@ -78,8 +75,10 @@ def train():
 
     else:
         # generators set to training mode
+        print('#' * 20, args['mode'])
+
         train_g = CULaneImageGenerator(
-            path=args.data-train,
+            path=args['data-train'],
             lookup_name=config.TRAIN_LOOKUP,
             batch_size=config.BATCH_SIZE,
             size=config.IMG_SIZE,
@@ -88,7 +87,7 @@ def train():
         )
 
         valid_g = CULaneImageGenerator(
-            path=args.data-train,
+            path=args['data-train'],
             lookup_name=config.VALID_LOOKUP,
             batch_size=config.BATCH_SIZE,
             size=config.IMG_SIZE,
@@ -110,16 +109,17 @@ def train():
     # train model
     history = model.fit_generator(
             train_generator,
-            epochs=args.epochs,
+            epochs=int(args['epochs']),
             callbacks=[tensorboard, model_checkpoint, reduce_lr],
             validation_data=valid_generator,
             shuffle=False
         )
     
     # save model and training log
-    model.save('{}.h5'.format(args.model-name))
+    model.save('{}.h5'.format(os.path.join(config.SAVE_PATH, args['model-name'])))
+    logpath = os.path.join(config.LOGDIR, args['model-name'])
 
-    with open('{}_logs.json'.format(args.model-name), 'w') as file:
+    with open('{}_logs.json'.format(logpath), 'w') as file:
         log = jsonify_history(history.history)
         json.dump(log, file, indent=4)
 

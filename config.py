@@ -1,8 +1,8 @@
 # paths
 TRAIN_PATH = './data'
 VALID_PATH = './data'
-SAVE_PATH = './assets/models'
-LOGDIR = './assets/logs'
+SAVE_PATH = 'data/models'
+LOGDIR = 'data/logs'
 
 # lookups
 TRAIN_LOOKUP = 'list.txt'
@@ -24,6 +24,7 @@ LOSS_GAMMA = 0.75
 LOSS_SMOOTH = 1e-6
 
 # train params
+LR = 0.001
 EPOCHS = 50
 DEBUG_EPOCHS = 2
 TRAIN_ENCODER = True
