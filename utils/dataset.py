@@ -8,7 +8,7 @@ from utils.decoding import mask_from_splines
 
 class CULaneImage:
 
-    def __init__(self, path, batch_size, lookup_name, size, **kwargs):
+    def __init__(self, path, lookup_name, batch_size, size, **kwargs):
         self._path = path
         self._batch_size = batch_size
         self._lookup_name = lookup_name
@@ -50,7 +50,11 @@ class CULaneImage:
         for idx, row in metadata.iterrows():
             # load image and switch color channels
             img_path = row['img_path'].replace('/', os.path.sep)
-            img = Image.open(os.path.join(self._path, img_path[1:]))
+
+            if img_path.startswith('/'):
+                img_path = img_path[1:]
+            
+            img = Image.open(os.path.join(self._path, img_path))
             img = np.array(img)
             img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
             height, width, _ = img.shape
@@ -58,7 +62,11 @@ class CULaneImage:
             # create empty mask and rebuild lines from splines
             mask_path = os.path.splitext(row['img_path'])[0]
             mask_path += '.lines.txt'
-            mask_path = os.path.join(self._path, mask_path[1:]).replace('/', os.path.sep)
+
+            if mask_path.startswith('/'):
+                mask_path = mask_path[1:]
+
+            mask_path = os.path.join(self._path, mask_path).replace('/', os.path.sep)
             mask = self._create_mask(size=(height, width), splines_path=mask_path)
 
             if self._augment:
