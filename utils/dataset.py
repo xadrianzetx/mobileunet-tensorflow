@@ -132,8 +132,8 @@ class CULaneImage:
 
 class CULaneImageIterator(CULaneImage):
 
-    def __init__(self, path, batch_size, lookup_name, **kwargs):
-        CULaneImage.__init__(self, path, batch_size, lookup_name, **kwargs)
+    def __init__(self, path, lookup_name, batch_size, size, **kwargs):
+        CULaneImage.__init__(self, path, lookup_name, batch_size, size, **kwargs)
         self._max_idx = self._lookup.shape[0]
         self._idx = 0
 
@@ -180,8 +180,8 @@ class CULaneImageIterator(CULaneImage):
 
 class CULaneImageGenerator(CULaneImage):
 
-    def __init__(self, path, batch_size, lookup_name, **kwargs):
-        CULaneImage.__init__(self, path, batch_size, lookup_name, **kwargs)
+    def __init__(self, path, lookup_name, batch_size, size, **kwargs):
+        CULaneImage.__init__(self, path, lookup_name, batch_size, size, **kwargs)
         self._max_idx = self._lookup.shape[0]
         self._idx = 0
 
