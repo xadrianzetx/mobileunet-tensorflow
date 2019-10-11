@@ -64,13 +64,13 @@ def train():
         train_generator = tf.data.Dataset.from_generator(
             generator=train_g,
             output_types=(tf.float16, tf.float16),
-            output_shapes=(config.GEN_IMG_OUT_SHAPE, config.GEN_MASK_OUT_SHAPE)
+            output_shapes=(config.DEBUG_GEN_IMG_OUT_SHAPE, config.DEBUG_GEN_MASK_OUT_SHAPE)
         )
 
         valid_generator = tf.data.Dataset.from_generator(
             generator=valid_g,
             output_types=(tf.float16, tf.float16),
-            output_shapes=(config.GEN_IMG_OUT_SHAPE, config.GEN_MASK_OUT_SHAPE)
+            output_shapes=(config.DEBUG_GEN_IMG_OUT_SHAPE, config.DEBUG_GEN_MASK_OUT_SHAPE)
         )
 
     else:
