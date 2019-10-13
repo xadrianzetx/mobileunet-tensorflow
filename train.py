@@ -46,7 +46,7 @@ def train():
         model = tf.keras.models.load_model(path, custom_objects=custom_obj)
 
     # callbacks
-    tensorboard = tf.keras.callbacks.TensorBoard(log_dir=config.LOGDIR)
+    tensorboard = tf.keras.callbacks.TensorBoard(log_dir=config.LOGDIR, update_freq='batch')
     model_checkpoint = tf.keras.callbacks.ModelCheckpoint(filepath=config.SAVE_PATH)
     reduce_lr = tf.keras.callbacks.ReduceLROnPlateau(factor=0.2, patience=5, min_lr=0.0001)
 
