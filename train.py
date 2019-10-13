@@ -23,7 +23,7 @@ def train():
         'mode': os.environ['--mode'],
         'data-train': os.environ['--data-train'],
         'epochs': os.environ['--epochs'],
-        'model-name': os.environ['--model-name']
+        'model-name': os.environ['--model-name'],
         'checkpoint-name': os.environ['--checkpoint']
     }
     
