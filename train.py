@@ -24,15 +24,26 @@ def train():
         'data-train': os.environ['--data-train'],
         'epochs': os.environ['--epochs'],
         'model-name': os.environ['--model-name']
+        'checkpoint-name': os.environ['--checkpoint']
     }
     
-    # model instance
-    model = MobileUNet(mode='binary', input_shape=config.IMG_SIZE, train_encoder=config.TRAIN_ENCODER).build()
-    loss = focal_tversky_loss(alpha=config.LOSS_ALPHA, beta=config.LOSS_BETA, gamma=config.LOSS_GAMMA)
-    optimizer = tf.keras.optimizers.Adam(learning_rate=config.LR)
+    if args['mode'] == 'train' or args['mode'] == 'debug':
+        # new model instance
+        model = MobileUNet(mode='binary', input_shape=config.IMG_SIZE, train_encoder=config.TRAIN_ENCODER).build()
+        loss = focal_tversky_loss(alpha=config.LOSS_ALPHA, beta=config.LOSS_BETA, gamma=config.LOSS_GAMMA)
+        optimizer = tf.keras.optimizers.Adam(learning_rate=config.LR)
 
-    metrics = [tf.keras.metrics.MeanIoU(num_classes=2), tf.keras.metrics.Precision(), dice_coefficient()]
-    model.compile(optimizer=optimizer, loss=loss, metrics=metrics)
+        metrics = [tf.keras.metrics.MeanIoU(num_classes=2), tf.keras.metrics.Precision(), dice_coefficient()]
+        model.compile(optimizer=optimizer, loss=loss, metrics=metrics)
+    
+    else:
+        # load from checkpoint
+        path = os.path.join(config.LOAD_PATH, args['checkpoint-name'])
+        custom_obj = {
+            'focal_tversky': focal_tversky_loss(alpha=0.7, beta=0.3, gamma=0.75), 
+            'dice': dice_coefficient()
+        }
+        model = tf.keras.models.load_model(path, custom_objects=custom_obj)
 
     # callbacks
     tensorboard = tf.keras.callbacks.TensorBoard(log_dir=config.LOGDIR)

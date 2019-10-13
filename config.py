@@ -2,11 +2,12 @@
 TRAIN_PATH = './data'
 VALID_PATH = './data'
 SAVE_PATH = 'data/models'
+LOAD_PATH = 'data/models'
 LOGDIR = 'data/logs'
 
 # lookups
-TRAIN_LOOKUP = 'list.txt'
-VALID_LOOKUP = 'valid_list.txt'
+TRAIN_LOOKUP = 'train.txt'
+VALID_LOOKUP = 'valid.txt'
 DEBUG_TRAIN_LOOKUP = 'debug_list.txt'
 
 # batch params
