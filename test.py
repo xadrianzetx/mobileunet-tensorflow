@@ -31,6 +31,8 @@ def predict(model, img, normalize=True):
   if normalize:
     img *= (1 / 255)
   
+  # add batch channel and run inference
+  # then round probas to classes with threshold 0.5
   pred = model.predict(np.expand_dims(img, axis=0))
   mask = np.round(pred[0, :, : ,0])
   out = image_mask_overlay(original, mask)
@@ -38,7 +40,7 @@ def predict(model, img, normalize=True):
   return out
 
 
-def from_img(src, model_src):
+def from_img(src, model_src, shrink=2):
     # lane segmentation on single frame
     # load image and resize to size expected by net
     img = Image.open(src)
@@ -52,15 +54,41 @@ def from_img(src, model_src):
     pred = predict(model, img, normalize=True)
 
     # resize back to original shape and show
-    pred = cv2.resize(pred, (width, height))
+    pred = cv2.resize(pred, (int(width) // shrink, int(height) // 2))
     cv2.imshow('image', pred.astype(np.uint8))
     cv2.waitKey(0)
 
 
-def from_video():
-    pass
+def from_video(src, model_src, shrink=2):
+    # lane segmentation on video feed
+    model = load_net(model_src)
+    cap = cv2.VideoCapture(src)
+
+    while cap.isOpened():
+        _, frame = cap.read()
+        frame = np.array(frame)
+        height, width, _ = frame.shape
+        frame = cv2.resize(frame, (512, 512))
+        frame = frame.astype(np.float32)
+
+        pred = predict(model, frame, normalize=True)
+        pred = cv2.resize(pred, (int(width) // shrink, int(height) // 2))
+        cv2.imshow('image', pred.astype(np.uint8))
+
+        if cv2.waitKey(1) and 0xFF == ord('q'):
+            break
+    
+    cap.release()
+    cv2.destroyAllWindows()
 
 
 if __name__ == "__main__":
     args = arguments()
-    from_img(args.f, args.s)
+
+    if args.m == 'image':
+        # single image pred
+        from_img(args.f, args.s)
+    
+    else:
+        # video feed
+        from_video(args.f, args.s)
