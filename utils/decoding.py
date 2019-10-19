@@ -49,9 +49,9 @@ def image_mask_overlay(img, mask):
                     original img with mask overlay
     """
     copy = img.copy()
-    img_mask = copy[mask != 0] = (255, 0, 255)
+    copy[mask != 0] = (255, 0, 255)
 
-    return img_mask
+    return copy
 
 
 def extract_frames(src, dst, n=3):
