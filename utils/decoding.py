@@ -40,20 +40,18 @@ def image_mask_overlay(img, mask):
     """
     Overlays masks over original img
 
-    :param img:     np.ndarray HxW
+    :param img:     np.ndarray HxWxC
                     original image
     :param mask:    np.ndarray HxW
                     mask
 
-    :return:        np.ndarray HxW
+    :return:        np.ndarray HxWxC
                     original img with mask overlay
     """
-    for i in range(mask.shape[0]):
-        for j in range(mask.shape[1]):
-            if mask[i, j] == 1:
-                img[i, j, :] = [255, 0, 255]
+    copy = img.copy()
+    img_mask = copy[mask != 0] = (255, 0, 255)
 
-    return img
+    return img_mask
 
 
 def extract_frames(src, dst, n=3):
