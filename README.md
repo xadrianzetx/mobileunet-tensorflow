@@ -16,7 +16,7 @@ Training environment is contenerized, however you still need some stuff installe
 
 This will allow to take full advantage of host GPUs from docker container.
 
-If you are running Ubuntu 16.04 then use ```envsetup.sh`` which will take care of setting up your host with all necessities.
+If you are running Ubuntu 16.04 then use ```envsetup.sh``` which will take care of setting up your host with all necessities.
 
 ```
 sudo dos2unix envsetup.sh && \ 
