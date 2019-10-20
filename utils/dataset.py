@@ -1,5 +1,6 @@
 import os
 import cv2
+import json
 import numpy as np
 import pandas as pd
 from PIL import Image
@@ -218,3 +219,42 @@ class CULaneImageGenerator(CULaneImage):
             
             if batch_x.shape[0] == self._batch_size:
               yield batch_x, batch_y
+
+
+class NightRideImageGenerator(CULaneImage):
+
+    def __init__(self, path, lookup_name, batch_size, size, **kwargs):
+        CULaneImage.__init__(self, path, lookup_name, batch_size, size, **kwargs)
+        self._max_idx = self._lookup_name.shape[0]
+        self._idx = 0
+    
+    def __call__(self):
+        pass
+
+    @staticmethod
+    def _create_mask(size, splines_path):
+        # creates segmentation mask from labelme .json files
+        mask = np.zeros(size, dtype=np.uint8)
+
+        with open(splines_path, 'r') as file:
+            labels = json.load(file)
+        
+        for shape in labels['shapes']:
+            x_coords = [int(x[0]) for x in shape['points']]
+            y_coords = [int(x[1]) for x in shape['points']]
+
+            # interpolate between pairs of coordinates
+            # this allows for correct mask placement on curved lines
+            # where sorting coords would break the mask
+            x_interp = [list(np.linspace(a, b, num=500).astype(int)) for a, b in zip(x_coords, x_coords[1:])]
+            y_interp = [list(np.linspace(a, b, num=500).astype(int)) for a, b in zip(y_coords, y_coords[1:])]
+            x_flat = np.array(x_interp).flatten()
+            y_flat = np.array(y_interp).flatten()
+
+            for x, y in zip(x_flat, y_flat):
+                cv2.circle(mask, (x, y), 8, (1), -1)
+
+        return mask
+    
+    def _get_batch(self, metadata):
+        pass
