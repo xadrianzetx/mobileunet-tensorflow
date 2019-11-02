@@ -1,5 +1,5 @@
 pandas
 Pillow
 opencv-python==3.4.0.12
-tensorflow-gpu==2.0.0rc1
+tensorflow-gpu==2.0.0
 gast==0.2.2
