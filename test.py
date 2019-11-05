@@ -3,7 +3,6 @@ import argparse
 import numpy as np
 import tensorflow as tf
 from PIL import Image
-from utils.decoding import image_mask_overlay
 from modelzoo.losses import focal_tversky_loss
 from modelzoo.metrics import dice_coefficient
 
@@ -37,7 +36,7 @@ def load_net(src, flatbuff):
 
 
 def predict(model, img, flatbuff, normalize=True):
-    original = img.copy()
+    masked = img.copy()
 
     if normalize:
         img *= (1 / 255)
@@ -56,10 +55,10 @@ def predict(model, img, flatbuff, normalize=True):
     else:
         pred = model.predict(img)
 
-    mask = np.round(pred[0, :, :, 0])
-    out = image_mask_overlay(original, mask)
+    mask = pred[0, :, :, 0]
+    masked[mask > 0.5] = (255, 0, 255)
 
-    return out
+    return masked
 
 
 def from_img(src, model_src, flatbuff, shrink=2):

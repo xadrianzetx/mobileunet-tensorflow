@@ -36,7 +36,7 @@ def mask_from_splines(line, mask):
     return mask
 
 
-def image_mask_overlay(img, mask):
+def image_mask_overlay(img, mask, threshold=0.5):
     """
     Overlays masks over original img
 
@@ -48,10 +48,9 @@ def image_mask_overlay(img, mask):
     :return:        np.ndarray HxWxC
                     original img with mask overlay
     """
-    copy = img.copy()
-    copy[mask != 0] = (255, 0, 255)
+    img[mask > threshold] = (255, 0, 255)
 
-    return copy
+    return img
 
 
 def extract_frames(src, dst, n=3):
@@ -63,7 +62,7 @@ def extract_frames(src, dst, n=3):
     :param dst: str
                 path to save directory
     :param n:   int
-                every nth frame will be saved    
+                every nth frame will be saved
 
     :return:    void
     """
@@ -85,7 +84,7 @@ def extract_frames(src, dst, n=3):
             frame_name = '{}_{}.jpg'.format(name, frame_count)
             output_path = os.path.join(dst.replace('/', os.path.sep), frame_name)
             cv2.imwrite(output_path, frame)
-        
+
         frame_count += 1
 
     cap.release()
