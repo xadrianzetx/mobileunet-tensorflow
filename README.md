@@ -45,7 +45,7 @@ Container has volume mapped to ```$(pwd)/data``` so make sure such path exists o
 
 ## Testing
 
-Run ```python test.py -m image -f ${IMG_PATH} -s ${SAVEPOINT}``` to test the model. You can pass ```-m image``` to run model on .jpg or ```-m video``` to run it on video feed.
+Run ```python test.py -m image -f ${IMG_PATH} -s ${SAVEPOINT}``` to test the model. You can pass ```-m image``` to run model on .jpg or ```-m video``` to run it on video feed. FlatBuffer model (.tflite) supported by passing ```--flatbuff```
 
 # References
 * [Ronneberger et al., 2015, U-Net: Convolutional Networks for Biomedical Image Segmentation](https://arxiv.org/pdf/1505.04597.pdf)
