@@ -1,9 +1,8 @@
 import os
 import json
 import yaml
-import argparse
 import tensorflow as tf
-from utils.dataset import CULaneImageGenerator
+from utils.dataset import NightRideImageGenerator
 from modelzoo.models import MobileUNet
 from modelzoo.losses import focal_tversky_loss
 from modelzoo.metrics import dice_coefficient
@@ -13,7 +12,7 @@ def jsonify_history(history):
     # converts history.history to serializable object
     for key in history.keys():
         history[key] = [str(x) for x in history[key]]
-    
+
     return history
 
 
@@ -29,28 +28,57 @@ def train():
 
     with open('config.yaml', 'r') as file:
         config = yaml.load(file)
-    
+
     if args['mode'] == 'train' or args['mode'] == 'debug':
         # new model instance
         input_shape = tuple(config['shapes']['image'])
         train_enc = config['training']['train_encoder']
-        l_params = config['loss']
 
-        model = MobileUNet(mode='binary', input_shape=input_shape, train_encoder=train_enc).build()
-        loss = focal_tversky_loss(alpha=l_params['alpha'], beta=l_params['beta'], gamma=l_params['gamma'])
-        optimizer = tf.keras.optimizers.Adam(learning_rate=config['training']['lr'])
+        unet = MobileUNet(
+            mode='binary',
+            input_shape=input_shape,
+            train_encoder=train_enc
+        )
 
-        metrics = [tf.keras.metrics.MeanIoU(num_classes=2), tf.keras.metrics.Precision(), dice_coefficient()]
-        model.compile(optimizer=optimizer, loss=loss, metrics=metrics)
-    
+        model = unet.build()
+
     else:
-        # load from checkpoint
+        # resume training from checkpoint
         path = os.path.join(config['paths']['checkpoint'], args['checkpoint-name'])
+
         custom_obj = {
-            'focal_tversky': focal_tversky_loss(alpha=0.7, beta=0.3, gamma=0.75), 
+            'focal_tversky': focal_tversky_loss(alpha=0.7, beta=0.3, gamma=0.75),
             'dice': dice_coefficient()
         }
-        model = tf.keras.models.load_model(path, custom_objects=custom_obj)
+
+        # load from .h5 file
+        model = tf.keras.models.load_model(
+            path,
+            custom_objects=custom_obj,
+            compile=False
+        )
+
+    # load loss params from config
+    loss_params = config['loss']
+
+    loss = focal_tversky_loss(
+        alpha=loss_params['alpha'],
+        beta=loss_params['beta'],
+        gamma=loss_params['gamma']
+    )
+
+    # init optimizer
+    optimizer = tf.keras.optimizers.Adam(lr=config['training']['lr'])
+
+    metrics = [
+        tf.keras.metrics.MeanIoU(num_classes=2),
+        tf.keras.metrics.Precision(),
+        dice_coefficient()
+    ]
+
+    # compile new model or recompile from checkpoint
+    # when anything has been changed
+    model.compile(optimizer=optimizer, loss=loss, metrics=metrics)
 
     # callbacks
     tensorboard = tf.keras.callbacks.TensorBoard(log_dir=config['paths']['logs'], update_freq='batch')
@@ -62,7 +90,7 @@ def train():
         # rest of the config is the same as training mode
         print('#' * 20, args['mode'])
 
-        train_g = CULaneImageGenerator(
+        train_g = NightRideImageGenerator(
             path=args['data-train'],
             lookup_name=config['lookups']['debug'],
             batch_size=config['batch']['debug_size'],
@@ -71,7 +99,7 @@ def train():
             augmentations=config['training']['augmentations']
         )
 
-        valid_g = CULaneImageGenerator(
+        valid_g = NightRideImageGenerator(
             path=args['data-train'],
             lookup_name=config['lookups']['debug'],
             batch_size=config['batch']['debug_size'],
@@ -99,7 +127,7 @@ def train():
         # generators set to training mode
         print('#' * 20, args['mode'])
 
-        train_g = CULaneImageGenerator(
+        train_g = NightRideImageGenerator(
             path=args['data-train'],
             lookup_name=config['lookups']['train'],
             batch_size=config['batch']['size'],
@@ -108,7 +136,7 @@ def train():
             augmentations=config['training']['augmentations']
         )
 
-        valid_g = CULaneImageGenerator(
+        valid_g = NightRideImageGenerator(
             path=args['data-train'],
             lookup_name=config['lookups']['valid'],
             batch_size=config['batch']['size'],
@@ -131,7 +159,7 @@ def train():
             output_types=(tf.float16, tf.float16),
             output_shapes=(image_out, mask_out)
         )
-    
+
     # train model
     history = model.fit_generator(
             train_generator,
@@ -140,7 +168,7 @@ def train():
             validation_data=valid_generator,
             shuffle=False
         )
-    
+
     # save model and training log
     model.save('{}.h5'.format(os.path.join(config['paths']['checkpoint'], args['model-name'])))
     logpath = os.path.join(config['paths']['logs'], args['model-name'])
