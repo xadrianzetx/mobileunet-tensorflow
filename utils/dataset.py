@@ -44,7 +44,7 @@ class CULaneImage:
         lookup = lookup.sample(frac=1).reset_index(drop=True)
 
         return lookup
-    
+
     def _get_batch(self, metadata):
         batch_x, batch_y = [], []
 
@@ -54,7 +54,7 @@ class CULaneImage:
 
             if img_path.startswith('/'):
                 img_path = img_path[1:]
-            
+
             img = Image.open(os.path.join(self._path, img_path))
             img = np.array(img)
             img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
@@ -79,7 +79,7 @@ class CULaneImage:
 
             batch_x.append(img)
             batch_y.append(mask)
-        
+
         return batch_x, batch_y
 
     def _augment_image_mask(self, img, mask):
@@ -89,14 +89,14 @@ class CULaneImage:
         if 'flip' in self._augmentations and np.random.choice([True, False], p=p):
             # horizontal flip
             pair = [cv2.flip(x, 1) for x in pair]
-        
+
         if 'rotate' in self._augmentations and np.random.choice([True, False], p=p):
             # randomly rotate img-mask pair
             theta = np.random.randint(-5, 5)
             height, width, _ = pair[0].shape
             rot_matrix = cv2.getRotationMatrix2D((width / 2, height / 2), theta, 1)
             pair = [cv2.warpAffine(x, rot_matrix, (width, height)) for x in pair]
-        
+
         if 'crop' in self._augmentations and np.random.choice([True, False], p=p):
             # crop random part of img
             # ratio is width // height
@@ -116,15 +116,15 @@ class CULaneImage:
             # crop image and resize to required size
             pair = [img[y:y + crop_height, x:x + crop_width] for img in pair]
             pair = [cv2.resize(x, self._size) for x in pair]
-        
+
         if 'brightness' in self._augmentations and np.random.choice([True, False], p=p):
             # brightness correction
             # https://docs.opencv.org/3.4/Basic_Linear_Transform_Tutorial_gamma.png
             gamma = np.random.uniform(0.67, 2.)
-            lookup = np.empty((1,256), np.uint8)
+            lookup = np.empty((1, 256), np.uint8)
 
             for i in range(256):
-                lookup[0,i] = np.clip(pow(i / 255.0, gamma) * 255.0, 0, 255)
+                lookup[0, i] = np.clip(pow(i / 255.0, gamma) * 255.0, 0, 255)
 
             pair[0] = cv2.LUT(pair[0], lookup)
 
@@ -189,7 +189,7 @@ class CULaneImageGenerator(CULaneImage):
     def __call__(self):
         """
         Creates batch of image-mask pairs from CULane dataset
-        
+
         Generator version to use with tf.data.Dataset.from_generator()
 
         Masks are build from splines annotations so that each
@@ -216,9 +216,9 @@ class CULaneImageGenerator(CULaneImage):
 
             if self._scale:
                 batch_x *= (1 / 255)
-            
+
             if batch_x.shape[0] == self._batch_size:
-              yield batch_x, batch_y
+                yield batch_x, batch_y
 
 
 class NightRideImageGenerator(CULaneImage):
@@ -227,11 +227,11 @@ class NightRideImageGenerator(CULaneImage):
         CULaneImage.__init__(self, path, lookup_name, batch_size, size, **kwargs)
         self._max_idx = self._lookup.shape[0]
         self._idx = 0
-    
+
     def __call__(self):
         """
         Creates batch of image-mask pairs from NightRide dataset
-        
+
         Generator version to use with tf.data.Dataset.from_generator()
 
         Masks are build from labelme .json files by interpolating
@@ -258,9 +258,9 @@ class NightRideImageGenerator(CULaneImage):
 
             if self._scale:
                 batch_x *= (1 / 255)
-            
+
             if batch_x.shape[0] == self._batch_size:
-              yield batch_x, batch_y
+                yield batch_x, batch_y
 
     @staticmethod
     def _interpolate(a, b, n=500):
@@ -274,7 +274,7 @@ class NightRideImageGenerator(CULaneImage):
 
         with open(splines_path, 'r') as file:
             labels = json.load(file)
-        
+
         for shape in labels['shapes']:
             x_coords = [int(x[0]) for x in shape['points']]
             y_coords = [int(x[1]) for x in shape['points']]
@@ -288,20 +288,21 @@ class NightRideImageGenerator(CULaneImage):
             y_flat = np.array(y_interp).flatten()
 
             for x, y in zip(x_flat, y_flat):
-                cv2.circle(mask, (x, y), 8, (1), -1)
+                cv2.circle(mask, (x, y), 6, (1), -1)
 
         return mask
-    
+
     def _get_batch(self, metadata):
         batch_x, batch_y = [], []
 
         for idx, row in metadata.iterrows():
             # load image and switch color channels
-            img_path = row['img_path'].replace('/', os.path.sep)
+            img_path = row['img_path']
 
             if img_path.startswith('/'):
                 img_path = img_path[1:]
-            
+
+            img_path.replace('/', os.path.sep)
             img = Image.open(os.path.join(self._path, img_path))
             img = np.array(img)
             img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
@@ -326,5 +327,5 @@ class NightRideImageGenerator(CULaneImage):
 
             batch_x.append(img)
             batch_y.append(mask)
-        
+
         return batch_x, batch_y
