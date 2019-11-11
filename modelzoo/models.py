@@ -17,7 +17,7 @@ class FastSCNN:
         if relu:
             # point-wise conv does not use non-linearity
             x = tf.keras.activations.relu(x)
-        
+
         return x
 
     @staticmethod
@@ -27,7 +27,7 @@ class FastSCNN:
         x = tf.keras.activations.relu(x)
 
         return x
-    
+
     @staticmethod
     def _conv_block_dc(inputs, kernel_size, strides):
         x = tf.keras.layers.DepthwiseConv2D(kernel_size, strides, depth_multiplier=1, padding='same')(inputs)
@@ -57,9 +57,9 @@ class FastSCNN:
         for _ in range(n - 1):
             # add remaining n - 1 bottleneck layers with skip connections
             x = self._bottleneck(x, n_filters, kernel_size, strides=1, expansion=expansion, skip=True)
-        
+
         return x
-    
+
     def _pyramid_pooling_block(self, inputs):
         concat_tensors = [inputs]
 
@@ -76,9 +76,9 @@ class FastSCNN:
             ppl = tf.keras.layers.Conv2D(128, kernel_size=3, strides=2, padding='same')(ppl)
             ppl = tf.keras.layers.Lambda(lambda x: tf.image.resize(x, (w, h)))(ppl)
             concat_tensors.append(ppl)
-        
+
         return tf.keras.layers.concatenate(concat_tensors)
-    
+
     def build(self):
         """
         Compiles Fast SCNN
@@ -123,7 +123,7 @@ class FastSCNN:
         if self._mode == 'binary':
             # pixel-wise binary classification
             outputs = tf.keras.activations.sigmoid(classifier)
-        
+
         else:
             # pixel-wise multiclass classification
             outputs = tf.keras.activations.softmax(classifier)
@@ -133,41 +133,97 @@ class FastSCNN:
 
 class MobileUNet:
 
-    def __init__(self, mode, input_shape, n_classes=1, train_encoder=False):
+    def __init__(self, mode, input_shape, n_classes=1, weight_decay=True, train_encoder=False):
         self._input_shape = input_shape
         self._trainable = train_encoder
         self._n_classes = n_classes
+        self._decay = weight_decay
         self._mode = mode
-    
-    @staticmethod
-    def _upconv(inputs, n_filters, kernel_size, strides):
-        x = tf.keras.layers.Conv2DTranspose(n_filters, kernel_size, strides, padding='same', use_bias=False)(inputs)
+
+    def _upconv(self, inputs, n_filters, kernel_size, strides):
+        if self._decay:
+            # L2 regularization on weights
+            x = tf.keras.layers.Conv2DTranspose(
+                n_filters,
+                kernel_size,
+                strides,
+                padding='same',
+                use_bias=False,
+                kernel_regularizer=tf.keras.regularizers.l2())(inputs)
+
+        else:
+            x = tf.keras.layers.Conv2DTranspose(
+                n_filters,
+                kernel_size,
+                strides,
+                padding='same',
+                use_bias=False)(inputs)
+
         x = tf.keras.layers.BatchNormalization()(x)
         x = tf.keras.activations.relu(x)
 
         return x
-    
-    @staticmethod
-    def _conv_ds(inputs, n_filters, kernel_size, strides):
-        x = tf.keras.layers.SeparableConv2D(n_filters, kernel_size=kernel_size, strides=strides, padding='same')(inputs)
+
+    def _conv_ds(self, inputs, n_filters, kernel_size, strides):
+        if self._decay:
+            # L2 regularization on weights
+            x = tf.keras.layers.SeparableConv2D(
+                n_filters,
+                kernel_size=kernel_size,
+                strides=strides,
+                padding='same',
+                kernel_regularizer=tf.keras.regularizers.l2())(inputs)
+
+        else:
+            x = tf.keras.layers.SeparableConv2D(
+                n_filters,
+                kernel_size=kernel_size,
+                strides=strides,
+                padding='same')(inputs)
+
         x = tf.keras.layers.BatchNormalization()(x)
         x = tf.keras.activations.relu(x)
 
         return x
-    
+
     def _residual_block(self, inputs, n_filters, kernel_size, strides):
-        x = self._conv_ds(inputs, n_filters=n_filters, kernel_size=kernel_size, strides=strides)
-        x = self._conv_ds(x, n_filters=n_filters, kernel_size=kernel_size, strides=strides)
+        x = self._conv_ds(
+            inputs,
+            n_filters=n_filters,
+            kernel_size=kernel_size,
+            strides=strides
+        )
+
+        x = self._conv_ds(
+            x,
+            n_filters=n_filters,
+            kernel_size=kernel_size,
+            strides=strides
+        )
 
         # depthwise conv skip connection
-        skip = tf.keras.layers.SeparableConv2D(n_filters, kernel_size=kernel_size, strides=strides, padding='same')(x)
+        if self._decay:
+            skip = tf.keras.layers.SeparableConv2D(
+                n_filters,
+                kernel_size=kernel_size,
+                strides=strides,
+                padding='same',
+                kernel_regularizer=tf.keras.regularizers.l2())(x)
+
+        else:
+            skip = tf.keras.layers.SeparableConv2D(
+                n_filters,
+                kernel_size=kernel_size,
+                strides=strides,
+                padding='same')(x)
+
         skip = tf.keras.layers.BatchNormalization()(skip)
         skip = tf.keras.activations.relu(skip)
 
         out = tf.keras.layers.Add()([skip, x])
 
         return out
-    
+
     def build(self, depthwise_decoder=True):
         """
         Builds U-Net encoder-decoder model with
@@ -183,12 +239,12 @@ class MobileUNet:
 
         if not self._trainable:
             base.trainable = False
-        
+
         # upsample and concat with block 13
         base_out = base.get_layer('block_16_project')
         skip_b13 = base.get_layer('block_13_expand_relu')
         n_filters = tf.keras.backend.int_shape(skip_b13.output)[-1]
-        
+
         if depthwise_decoder:
             # bridge first
             x = self._residual_block(base_out.output, n_filters=n_filters, kernel_size=3, strides=1)
@@ -206,12 +262,12 @@ class MobileUNet:
         # upsample and concat with block 6
         skip_b6 = base.get_layer('block_6_expand_relu')
         n_filters = tf.keras.backend.int_shape(skip_b6.output)[-1]
-        
+
         if depthwise_decoder:
             x = tf.keras.layers.UpSampling2D((2, 2))(x)
             x = tf.keras.layers.Concatenate()([x, skip_b6.output])
             x = self._residual_block(x, n_filters=n_filters, kernel_size=3, strides=1)
-        
+
         else:
             x = self._upconv(x, n_filters=n_filters, kernel_size=3, strides=2)
             x = tf.keras.layers.Concatenate()([x, skip_b6.output])
@@ -224,7 +280,7 @@ class MobileUNet:
             x = tf.keras.layers.UpSampling2D((2, 2))(x)
             x = tf.keras.layers.Concatenate()([x, skip_b3.output])
             x = self._residual_block(x, n_filters=n_filters, kernel_size=3, strides=1)
-        
+
         else:
             x = self._upconv(x, n_filters=n_filters, kernel_size=3, strides=2)
             x = tf.keras.layers.Concatenate()([x, skip_b3.output])
@@ -237,7 +293,7 @@ class MobileUNet:
             x = tf.keras.layers.UpSampling2D((2, 2))(x)
             x = tf.keras.layers.Concatenate()([x, skip_b1.output])
             x = self._residual_block(x, n_filters=n_filters, kernel_size=3, strides=1)
-        
+
         else:
             x = self._upconv(x, n_filters=n_filters, kernel_size=3, strides=2)
             x = tf.keras.layers.Concatenate()([x, skip_b1.output])
@@ -246,10 +302,10 @@ class MobileUNet:
             x = tf.keras.layers.UpSampling2D((2, 2))(x)
             x = tf.keras.layers.SeparableConv2D(1, kernel_size=3, strides=1, padding='same')(x)
             out = tf.keras.activations.sigmoid(x)
-        
+
         else:
             x = tf.keras.layers.UpSampling2D((2, 2))(x)
             x = tf.keras.layers.SeparableConv2D(self._n_classes, kernel_size=3, strides=1, padding='same')(x)
             out = tf.keras.activations.softmax(x)
-        
+
         return tf.keras.models.Model(inputs=base.input, outputs=out)
