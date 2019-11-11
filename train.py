@@ -96,7 +96,8 @@ def train():
             batch_size=config['batch']['debug_size'],
             size=tuple(config['shapes']['image']),
             augment=True,
-            augmentations=config['training']['augmentations']
+            augmentations=config['training']['augmentations'],
+            augment_proba=config['training']['augment_proba']
         )
 
         valid_g = NightRideImageGenerator(
@@ -133,7 +134,8 @@ def train():
             batch_size=config['batch']['size'],
             size=tuple(config['shapes']['image']),
             augment=True,
-            augmentations=config['training']['augmentations']
+            augmentations=config['training']['augmentations'],
+            augment_proba=config['training']['augment_proba']
         )
 
         valid_g = NightRideImageGenerator(
