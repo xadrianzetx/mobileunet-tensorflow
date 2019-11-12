@@ -1,0 +1,66 @@
+# paths
+paths:
+  train: './data'
+  valid: './data'
+  checkpoint: 'data/models'
+  logs: 'data/logs'
+
+# lookups
+lookups:
+  train: 'train.txt'
+  valid: 'valid.txt'
+  debug: 'debug_list.txt'
+
+# shapes
+shapes:
+  image:
+    - 512
+    - 512
+    - 3
+  mask:
+    - 512
+    - 512
+    - 1
+  image_generator:
+    - 5
+    - 512
+    - 512
+    - 3
+  mask_generator:
+    - 5
+    - 512
+    - 512
+    - 1
+  debug_image_generator:
+    - 2
+    - 512
+    - 512
+    - 3
+  debug_mask_generator:
+    - 2
+    - 512
+    - 512
+    - 1
+
+# batch params
+batch:
+  size: 5
+  debug_size: 2
+
+# loss params
+loss:
+  alpha: 0.7
+  beta: 0.3
+  gamma: 0.75
+  smooth: 1e-6
+
+# train params
+training:
+  lr: 0.001
+  epochs: 50
+  debug_epochs: 2
+  train_encoder: True
+  augmentations:
+    - 'flip'
+    - 'rotate'
+  augment_proba: 0.4

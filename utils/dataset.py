@@ -1,5 +1,6 @@
 import os
 import cv2
+import json
 import numpy as np
 import pandas as pd
 from PIL import Image
@@ -43,7 +44,7 @@ class CULaneImage:
         lookup = lookup.sample(frac=1).reset_index(drop=True)
 
         return lookup
-    
+
     def _get_batch(self, metadata):
         batch_x, batch_y = [], []
 
@@ -53,7 +54,7 @@ class CULaneImage:
 
             if img_path.startswith('/'):
                 img_path = img_path[1:]
-            
+
             img = Image.open(os.path.join(self._path, img_path))
             img = np.array(img)
             img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
@@ -78,7 +79,7 @@ class CULaneImage:
 
             batch_x.append(img)
             batch_y.append(mask)
-        
+
         return batch_x, batch_y
 
     def _augment_image_mask(self, img, mask):
@@ -88,14 +89,14 @@ class CULaneImage:
         if 'flip' in self._augmentations and np.random.choice([True, False], p=p):
             # horizontal flip
             pair = [cv2.flip(x, 1) for x in pair]
-        
+
         if 'rotate' in self._augmentations and np.random.choice([True, False], p=p):
             # randomly rotate img-mask pair
             theta = np.random.randint(-5, 5)
             height, width, _ = pair[0].shape
             rot_matrix = cv2.getRotationMatrix2D((width / 2, height / 2), theta, 1)
             pair = [cv2.warpAffine(x, rot_matrix, (width, height)) for x in pair]
-        
+
         if 'crop' in self._augmentations and np.random.choice([True, False], p=p):
             # crop random part of img
             # ratio is width // height
@@ -115,15 +116,15 @@ class CULaneImage:
             # crop image and resize to required size
             pair = [img[y:y + crop_height, x:x + crop_width] for img in pair]
             pair = [cv2.resize(x, self._size) for x in pair]
-        
+
         if 'brightness' in self._augmentations and np.random.choice([True, False], p=p):
             # brightness correction
             # https://docs.opencv.org/3.4/Basic_Linear_Transform_Tutorial_gamma.png
             gamma = np.random.uniform(0.67, 2.)
-            lookup = np.empty((1,256), np.uint8)
+            lookup = np.empty((1, 256), np.uint8)
 
             for i in range(256):
-                lookup[0,i] = np.clip(pow(i / 255.0, gamma) * 255.0, 0, 255)
+                lookup[0, i] = np.clip(pow(i / 255.0, gamma) * 255.0, 0, 255)
 
             pair[0] = cv2.LUT(pair[0], lookup)
 
@@ -188,7 +189,7 @@ class CULaneImageGenerator(CULaneImage):
     def __call__(self):
         """
         Creates batch of image-mask pairs from CULane dataset
-        
+
         Generator version to use with tf.data.Dataset.from_generator()
 
         Masks are build from splines annotations so that each
@@ -215,6 +216,116 @@ class CULaneImageGenerator(CULaneImage):
 
             if self._scale:
                 batch_x *= (1 / 255)
-            
+
             if batch_x.shape[0] == self._batch_size:
-              yield batch_x, batch_y
+                yield batch_x, batch_y
+
+
+class NightRideImageGenerator(CULaneImage):
+
+    def __init__(self, path, lookup_name, batch_size, size, **kwargs):
+        CULaneImage.__init__(self, path, lookup_name, batch_size, size, **kwargs)
+        self._max_idx = self._lookup.shape[0]
+        self._idx = 0
+
+    def __call__(self):
+        """
+        Creates batch of image-mask pairs from NightRide dataset
+
+        Generator version to use with tf.data.Dataset.from_generator()
+
+        Masks are build from labelme .json files by interpolating
+        spline coordinates.
+
+        :return:    img: np.ndarray HxWxC
+                    NightRide dataset image
+                    mask: np.ndarray HxW
+                    binary mask for semantic segmentation
+        """
+        # reset idx and shuffle batch on epoch start
+        self._lookup = self._lookup.sample(frac=1).reset_index(drop=True)
+        self._idx = 0
+
+        while self._idx < self._max_idx:
+            # get batch of img-mask pairs
+            # generator StopIteration is controlled by tf.data.Dataset
+            batch = self._lookup.loc[self._idx:self._idx + self._batch_size - 1]
+            self._idx += self._batch_size
+
+            batch_x, batch_y = self._get_batch(metadata=batch)
+            batch_x = np.array(batch_x).astype(float)
+            batch_y = np.array(batch_y).astype(float)
+
+            if self._scale:
+                batch_x *= (1 / 255)
+
+            if batch_x.shape[0] == self._batch_size:
+                yield batch_x, batch_y
+
+    @staticmethod
+    def _interpolate(a, b, n=500):
+        # interpolates n points
+        # between two coordinates
+        return list(np.linspace(a, b, num=n).astype(int))
+
+    def _create_mask(self, size, splines_path):
+        # creates segmentation mask from labelme .json files
+        mask = np.zeros(size, dtype=np.uint8)
+
+        with open(splines_path, 'r') as file:
+            labels = json.load(file)
+
+        for shape in labels['shapes']:
+            x_coords = [int(x[0]) for x in shape['points']]
+            y_coords = [int(x[1]) for x in shape['points']]
+
+            # interpolate between pairs of coordinates
+            # this allows for correct mask placement on curved lines
+            # where sorting coords would break the mask
+            x_interp = [self._interpolate(a, b) for a, b in zip(x_coords, x_coords[1:])]
+            y_interp = [self._interpolate(a, b) for a, b in zip(y_coords, y_coords[1:])]
+            x_flat = np.array(x_interp).flatten()
+            y_flat = np.array(y_interp).flatten()
+
+            for x, y in zip(x_flat, y_flat):
+                cv2.circle(mask, (x, y), 6, (1), -1)
+
+        return mask
+
+    def _get_batch(self, metadata):
+        batch_x, batch_y = [], []
+
+        for idx, row in metadata.iterrows():
+            # load image and switch color channels
+            img_path = row['img_path']
+
+            if img_path.startswith('/'):
+                img_path = img_path[1:]
+
+            img_path.replace('/', os.path.sep)
+            img = Image.open(os.path.join(self._path, img_path))
+            img = np.array(img)
+            img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+            height, width, _ = img.shape
+
+            # create empty mask and rebuild lines from splines
+            mask_path = row['img_path'][:-4]
+            mask_path += '.json'
+
+            if mask_path.startswith('/'):
+                mask_path = mask_path[1:]
+
+            mask_path = os.path.join(self._path, mask_path).replace('/', os.path.sep)
+            mask = self._create_mask(size=(height, width), splines_path=mask_path)
+
+            if self._augment:
+                img, mask = self._augment_image_mask(img, mask)
+
+            img = cv2.resize(img, self._size)
+            mask = cv2.resize(mask, self._size)
+            mask = np.expand_dims(mask, axis=-1)
+
+            batch_x.append(img)
+            batch_y.append(mask)
+
+        return batch_x, batch_y
