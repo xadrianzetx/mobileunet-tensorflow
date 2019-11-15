@@ -37,7 +37,8 @@ def train():
         unet = MobileUNet(
             mode='binary',
             input_shape=input_shape,
-            train_encoder=train_enc
+            train_encoder=train_enc,
+            weight_decay=True
         )
 
         model = unet.build()
@@ -83,7 +84,8 @@ def train():
     # callbacks
     tensorboard = tf.keras.callbacks.TensorBoard(log_dir=config['paths']['logs'], update_freq='batch')
     model_checkpoint = tf.keras.callbacks.ModelCheckpoint(filepath=config['paths']['checkpoint'])
-    reduce_lr = tf.keras.callbacks.ReduceLROnPlateau(factor=0.2, patience=5, min_lr=0.0001)
+    reduce_lr = tf.keras.callbacks.ReduceLROnPlateau(factor=0.2, patience=3, min_lr=0.0001)
+    stopping = tf.keras.callbacks.EarlyStopping(monitor='val_loss', patience=4)
 
     if args['mode'] == 'debug':
         # sets both generators to output batch from debug list of images
@@ -163,10 +165,11 @@ def train():
         )
 
     # train model
+    # shuffling is done by generator
     history = model.fit_generator(
             train_generator,
             epochs=int(args['epochs']),
-            callbacks=[tensorboard, model_checkpoint, reduce_lr],
+            callbacks=[tensorboard, model_checkpoint, reduce_lr, stopping],
             validation_data=valid_generator,
             shuffle=False
         )
