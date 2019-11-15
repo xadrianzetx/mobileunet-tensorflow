@@ -14,37 +14,37 @@ lookups:
 # shapes
 shapes:
   image:
-    - 512
-    - 512
+    - 192
+    - 192
     - 3
   mask:
-    - 512
-    - 512
+    - 192
+    - 192
     - 1
   image_generator:
-    - 5
-    - 512
-    - 512
+    - 10
+    - 192
+    - 192
     - 3
   mask_generator:
-    - 5
-    - 512
-    - 512
+    - 10
+    - 192
+    - 192
     - 1
   debug_image_generator:
     - 2
-    - 512
-    - 512
+    - 192
+    - 192
     - 3
   debug_mask_generator:
     - 2
-    - 512
-    - 512
+    - 192
+    - 192
     - 1
 
 # batch params
 batch:
-  size: 5
+  size: 10
   debug_size: 2
 
 # loss params
@@ -63,4 +63,5 @@ training:
   augmentations:
     - 'flip'
     - 'rotate'
+    - 'brightness'
   augment_proba: 0.4
