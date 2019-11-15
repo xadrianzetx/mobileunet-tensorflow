@@ -40,7 +40,7 @@ class FastSCNN:
         # channles expansion factor
         exp_channel = tf.keras.backend.int_shape(inputs)[-1] * expansion
 
-        # bottleneck residual block transfers the input from c to c' 
+        # bottleneck residual block transfers the input from c to c'
         # channels with expansion factor t
         x = self._conv_block(inputs, n_filters=exp_channel, kernel_size=1, strides=1)
         x = self._conv_block_dc(x, kernel_size=kernel_size, strides=strides)
@@ -69,7 +69,7 @@ class FastSCNN:
         h = inputs_shape[2]
 
         for bin_size in self.bin_sizes:
-            # pyramid parsing module is applied to harvest 
+            # pyramid parsing module is applied to harvest
             # different sub-region representations
             ppm_size = (w // bin_size, h // bin_size)
             ppl = tf.keras.layers.AveragePooling2D(pool_size=ppm_size, strides=ppm_size)(inputs)
@@ -226,8 +226,8 @@ class MobileUNet:
 
     def build(self, depthwise_decoder=True):
         """
-        Builds U-Net encoder-decoder model with
-        pre trainded MobileNetV2 encoder
+        Builds U-Net with pre trainded
+        MobileNetV2 backbone
 
         Encoder is using ImageNet weights and can be
         frozen or trained with decoder
@@ -244,62 +244,67 @@ class MobileUNet:
         if not self._trainable:
             base.trainable = False
 
-        # upsample and concat with block 13
         base_out = base.get_layer('block_16_project')
+
+        # encoder skip connections
+        # block 13
         skip_b13 = base.get_layer('block_13_expand_relu')
-        n_filters = tf.keras.backend.int_shape(skip_b13.output)[-1]
+        s13_filters = tf.keras.backend.int_shape(skip_b13.output)[-1]
+
+        # block 6
+        skip_b6 = base.get_layer('block_6_expand_relu')
+        s6_filters = tf.keras.backend.int_shape(skip_b6.output)[-1]
+
+        # block 3
+        skip_b3 = base.get_layer('block_3_expand_relu')
+        s3_filters = tf.keras.backend.int_shape(skip_b3.output)[-1]
+
+        # block 1
+        skip_b1 = base.get_layer('block_1_expand_relu')
+        s1_filters = tf.keras.backend.int_shape(skip_b1.output)[-1]
 
         if depthwise_decoder:
             # bridge first
-            x = self._residual_block(base_out.output, n_filters=n_filters, kernel_size=3, strides=1)
-            x = self._residual_block(x, n_filters=n_filters, kernel_size=3, strides=1)
+            x = self._residual_block(base_out.output, n_filters=s13_filters, kernel_size=3, strides=1)
+            x = self._residual_block(x, n_filters=s13_filters, kernel_size=3, strides=1)
 
             # and start going up
             x = tf.keras.layers.UpSampling2D((2, 2))(x)
             x = tf.keras.layers.Concatenate()([x, skip_b13.output])
-            x = self._residual_block(x, n_filters=n_filters, kernel_size=3, strides=1)
+            x = self._residual_block(x, n_filters=s6_filters, kernel_size=3, strides=1)
 
         else:
-            x = self._upconv(base_out.output, n_filters=n_filters, kernel_size=3, strides=2)
+            x = self._upconv(base_out.output, n_filters=s6_filters, kernel_size=3, strides=2)
             x = tf.keras.layers.Concatenate()([x, skip_b13.output])
 
         # upsample and concat with block 6
-        skip_b6 = base.get_layer('block_6_expand_relu')
-        n_filters = tf.keras.backend.int_shape(skip_b6.output)[-1]
-
         if depthwise_decoder:
             x = tf.keras.layers.UpSampling2D((2, 2))(x)
             x = tf.keras.layers.Concatenate()([x, skip_b6.output])
-            x = self._residual_block(x, n_filters=n_filters, kernel_size=3, strides=1)
+            x = self._residual_block(x, n_filters=s3_filters, kernel_size=3, strides=1)
 
         else:
-            x = self._upconv(x, n_filters=n_filters, kernel_size=3, strides=2)
+            x = self._upconv(x, n_filters=s3_filters, kernel_size=3, strides=2)
             x = tf.keras.layers.Concatenate()([x, skip_b6.output])
 
         # upsample and concat with block 3
-        skip_b3 = base.get_layer('block_3_expand_relu')
-        n_filters = tf.keras.backend.int_shape(skip_b3.output)[-1]
-
         if depthwise_decoder:
             x = tf.keras.layers.UpSampling2D((2, 2))(x)
             x = tf.keras.layers.Concatenate()([x, skip_b3.output])
-            x = self._residual_block(x, n_filters=n_filters, kernel_size=3, strides=1)
+            x = self._residual_block(x, n_filters=s1_filters, kernel_size=3, strides=1)
 
         else:
-            x = self._upconv(x, n_filters=n_filters, kernel_size=3, strides=2)
+            x = self._upconv(x, n_filters=s1_filters, kernel_size=3, strides=2)
             x = tf.keras.layers.Concatenate()([x, skip_b3.output])
 
         # upsample and concat with block 1
-        skip_b1 = base.get_layer('block_1_expand_relu')
-        n_filters = tf.keras.backend.int_shape(skip_b1.output)[-1]
-
         if depthwise_decoder:
             x = tf.keras.layers.UpSampling2D((2, 2))(x)
             x = tf.keras.layers.Concatenate()([x, skip_b1.output])
-            x = self._residual_block(x, n_filters=n_filters, kernel_size=3, strides=1)
+            x = self._residual_block(x, n_filters=64, kernel_size=3, strides=1)
 
         else:
-            x = self._upconv(x, n_filters=n_filters, kernel_size=3, strides=2)
+            x = self._upconv(x, n_filters=64, kernel_size=3, strides=2)
             x = tf.keras.layers.Concatenate()([x, skip_b1.output])
 
         if self._mode == 'binary':
