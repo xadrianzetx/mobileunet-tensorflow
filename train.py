@@ -2,7 +2,7 @@ import os
 import json
 import yaml
 import tensorflow as tf
-from utils.dataset import CULaneImageGenerator
+from utils.dataset import NightRideImageGenerator
 from modelzoo.models import MobileUNet
 from modelzoo.losses import focal_tversky_loss
 from modelzoo.metrics import dice_coefficient
@@ -92,7 +92,7 @@ def train():
         # rest of the config is the same as training mode
         print('#' * 20, args['mode'])
 
-        train_g = CULaneImageGenerator(
+        train_g = NightRideImageGenerator(
             path=args['data-train'],
             lookup_name=config['lookups']['debug'],
             batch_size=config['batch']['debug_size'],
@@ -102,7 +102,7 @@ def train():
             augment_proba=config['training']['augment_proba']
         )
 
-        valid_g = CULaneImageGenerator(
+        valid_g = NightRideImageGenerator(
             path=args['data-train'],
             lookup_name=config['lookups']['debug'],
             batch_size=config['batch']['debug_size'],
@@ -130,7 +130,7 @@ def train():
         # generators set to training mode
         print('#' * 20, args['mode'])
 
-        train_g = CULaneImageGenerator(
+        train_g = NightRideImageGenerator(
             path=args['data-train'],
             lookup_name=config['lookups']['train'],
             batch_size=config['batch']['size'],
@@ -140,7 +140,7 @@ def train():
             augment_proba=config['training']['augment_proba']
         )
 
-        valid_g = CULaneImageGenerator(
+        valid_g = NightRideImageGenerator(
             path=args['data-train'],
             lookup_name=config['lookups']['valid'],
             batch_size=config['batch']['size'],
