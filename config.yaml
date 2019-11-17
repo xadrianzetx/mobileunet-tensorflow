@@ -63,5 +63,4 @@ training:
   augmentations:
     - 'flip'
     - 'rotate'
-    - 'brightness'
   augment_proba: 0.4
