@@ -346,9 +346,71 @@ class MobileFPNet:
         skips = [self._backbone.get_layer(segname.format(i)) for i in blocks]
         backbone_out = self._backbone.get_layer('block_16_project')
 
-        # TODO add FPN blocks and segmentation blocks
+        p5 = self._fpn_block(backbone_out.output, skips[0].output)
+        p4 = self._fpn_block(p5, skips[1].output)
+        p3 = self._fpn_block(p4, skips[2].output)
+        p2 = self._fpn_block(p3, skips[3].output)
 
+        s5 = self._conv_block(p5, 128)
+        s4 = self._conv_block(p4, 128)
+        s3 = self._conv_block(p3, 128)
+        s2 = self._conv_block(p2, 128)
+
+        s5 = tf.keras.layers.UpSampling2D(
+            size=(8, 8),
+            interpolation='nearest'
+        )(s5)
+
+        s4 = tf.keras.layers.UpSampling2D(
+            size=(4, 4),
+            interpolation='nearest'
+        )(s4)
+
+        s3 = tf.keras.layers.UpSampling2D(
+            size=(2, 2),
+            interpolation='nearest'
+        )(s3)
+
+        concat = [s5, s4, s3, s2]
+        x = tf.keras.layers.Concatenate()(concat)
+        x = tf.keras.layers.SeparableConv2D(
+            128,
+            kernel_size=3,
+            padding='same',
+            depthwise_initializer='he_uniform',
+            pointwise_initializer='he_uniform'
+        )(x)
+
+        x = tf.keras.layers.BatchNormalization()(x)
+        x = tf.keras.layers.Activation('relu')(x)
+        x = tf.keras.layers.UpSampling2D((2, 2))(x)
+
+        x = tf.keras.layers.SeparableConv2D(
+            1,
+            kernel_size=3,
+            padding='same',
+            depthwise_initializer='glorot_uniform',
+            pointwise_initializer='glorot_uniform'
+        )(x)
+
+        out = tf.keras.layers.Activation('sigmoid')(x)
+        model = tf.keras.models.Model(
+            inputs=self._backbone.input,
+            outputs=out
+        )
+
+        return model
+
+    @staticmethod
     def _fpn_block(inputs, skip):
+        inputs = tf.keras.layers.SeparableConv2D(
+            256,
+            kernel_size=1,
+            padding='same',
+            depthwise_initializer='he_uniform',
+            pointwise_initializer='he_uniform'
+        )(inputs)
+
         skip = tf.keras.layers.SeparableConv2D(
             256,
             kernel_size=1,
@@ -361,6 +423,7 @@ class MobileFPNet:
 
         return out
 
+    @staticmethod
     def _conv_block(inputs, filters):
         x = tf.keras.layers.SeparableConv2D(
             filters,
