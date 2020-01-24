@@ -320,85 +320,155 @@ class MobileUNet:
         return tf.keras.models.Model(inputs=base.input, outputs=out)
 
 
-class MobileUNetFS(MobileUNet):
+class MobileFPNet:
 
-    def __init__(self, mode, input_shape, n_classes=1, weight_decay=True, train_encoder=False):
-        MobileUNet.__init__(
-            self,
-            mode,
-            input_shape,
-            n_classes=n_classes,
-            weight_decay=weight_decay,
-            train_encoder=train_encoder
-        )
-
-    def build(self, depthwise_decoder=True):
-        """
-        Builds U-Net with pre trainded MobileNetV2
-        backbone. This one uses fractionally strided
-        convolutions to upsample
-
-        Encoder is using ImageNet weights and can be
-        frozen or trained with decoder
-
-        :return:    tf.keras.models.Model
-                    Ready to compile MobileUnet
-        """
-        base = tf.keras.applications.MobileNetV2(
-            input_shape=self._input_shape,
+    def __init__(self, input_shape, train_encoder=False):
+        self._input_shape = input_shape
+        self._backbone = tf.keras.applications.MobileNetV2(
+            input_shape=input_shape,
             include_top=False,
             weights='imagenet'
         )
 
-        if not self._trainable:
-            base.trainable = False
+    @property
+    def trainable_encoder(self):
+        return self._backbone.trainable
 
-        # upsample and concat with block 13
-        base_out = base.get_layer('block_16_project')
-        skip_b13 = base.get_layer('block_13_expand_relu')
-        n_filters = tf.keras.backend.int_shape(skip_b13.output)[-1]
+    @trainable_encoder.setter
+    def trainable_encoder(self, val):
+        self._backbone.trainable = val
 
-        # bridge first
-        x = self._residual_block(base_out.output, n_filters=n_filters, kernel_size=3, strides=1)
-        x = self._residual_block(x, n_filters=n_filters, kernel_size=3, strides=1)
+    def __call__(self):
+        """
+        Creates instance of FPN Net with MobileNetV2 backbone.
 
-        # and start going up
-        x = self._upconv(x, n_filters=n_filters, kernel_size=3, strides=2)
-        x = tf.keras.layers.Concatenate()([x, skip_b13.output])
-        x = self._residual_block(x, n_filters=n_filters, kernel_size=3, strides=1)
+        based on:
+        https://arxiv.org/pdf/1612.03144.pdf
+        https://github.com/qubvel/segmentation_models/blob/master/segmentation_models/models/fpn.py
 
-        # upsample and concat with block 6
-        skip_b6 = base.get_layer('block_6_expand_relu')
-        n_filters = tf.keras.backend.int_shape(skip_b6.output)[-1]
+        Net has been modified to fully compile
+        to Edge TPU with 192x192x3 input size.
 
-        x = self._upconv(x, n_filters=n_filters, kernel_size=3, strides=2)
-        x = tf.keras.layers.Concatenate()([x, skip_b6.output])
-        x = self._residual_block(x, n_filters=n_filters, kernel_size=3, strides=1)
+        :return:    tf.keras.models.Model
+                    FPN net instance
+        """
+        segname = 'block_{}_expand_relu'
+        blocks = [13, 6, 3, 1]
+        skips = [self._backbone.get_layer(segname.format(i)) for i in blocks]
+        backbone_out = self._backbone.get_layer('block_16_project')
 
-        # upsample and concat with block 3
-        skip_b3 = base.get_layer('block_3_expand_relu')
-        n_filters = tf.keras.backend.int_shape(skip_b3.output)[-1]
+        p5 = self._fpn_block(backbone_out.output, skips[0].output)
+        p4 = self._fpn_block(p5, skips[1].output)
+        p3 = self._fpn_block(p4, skips[2].output)
+        p2 = self._fpn_block(p3, skips[3].output)
 
-        x = self._upconv(x, n_filters=n_filters, kernel_size=3, strides=2)
-        x = tf.keras.layers.Concatenate()([x, skip_b3.output])
-        x = self._residual_block(x, n_filters=n_filters, kernel_size=3, strides=1)
+        s5 = self._conv_block(p5, 128)
+        s4 = self._conv_block(p4, 128)
+        s3 = self._conv_block(p3, 128)
+        s2 = self._conv_block(p2, 128)
 
-        # upsample and concat with block 1
-        skip_b1 = base.get_layer('block_1_expand_relu')
-        n_filters = tf.keras.backend.int_shape(skip_b1.output)[-1]
+        s5 = tf.keras.layers.UpSampling2D(
+            size=(8, 8),
+            interpolation='nearest'
+        )(s5)
 
-        x = self._upconv(x, n_filters=n_filters, kernel_size=3, strides=2)
-        x = tf.keras.layers.Concatenate()([x, skip_b1.output])
-        x = self._residual_block(x, n_filters=n_filters, kernel_size=3, strides=1)
+        s4 = tf.keras.layers.UpSampling2D(
+            size=(4, 4),
+            interpolation='nearest'
+        )(s4)
 
-        if self._mode == 'binary':
-            x = self._upconv(x, n_filters=n_filters, kernel_size=3, strides=2)
-            x = tf.keras.layers.SeparableConv2D(1, kernel_size=3, strides=1, padding='same')(x)
-            out = tf.keras.activations.sigmoid(x)
+        s3 = tf.keras.layers.UpSampling2D(
+            size=(2, 2),
+            interpolation='nearest'
+        )(s3)
 
-        else:
-            x = self._upconv(x, n_filters=n_filters, kernel_size=3, strides=2)
-            x = tf.keras.layers.SeparableConv2D(self._n_classes, kernel_size=3, strides=1, padding='same')(x)
-            out = tf.keras.activations.softmax(x)
+        concat = [s5, s4, s3, s2]
+        x = tf.keras.layers.Concatenate()(concat)
+        x = tf.keras.layers.Conv2D(
+            64,
+            kernel_size=3,
+            padding='same',
+            kernel_initializer='he_uniform'
+        )(x)
 
-        return tf.keras.models.Model(inputs=base.input, outputs=out)
+        x = tf.keras.layers.BatchNormalization()(x)
+        x = tf.keras.layers.Activation('relu')(x)
+        x = tf.keras.layers.UpSampling2D((2, 2))(x)
+
+        x = tf.keras.layers.Conv2D(
+            1,
+            kernel_size=3,
+            padding='same',
+            kernel_initializer='he_uniform'
+        )(x)
+
+        out = tf.keras.layers.Activation('sigmoid')(x)
+        model = tf.keras.models.Model(
+            inputs=self._backbone.input,
+            outputs=out
+        )
+
+        return model
+
+    @staticmethod
+    def _fpn_block(inputs, skip):
+        inputs = tf.keras.layers.Conv2D(
+            256,
+            kernel_size=1,
+            padding='same',
+            kernel_initializer='he_uniform'
+
+        skip = tf.keras.layers.SeparableConv2D(
+            256,
+            kernel_size=1,
+            kernel_initializer='he_uniform'
+        )(skip)
+
+        up = tf.keras.layers.UpSampling2D((2, 2))(inputs)
+        out = tf.keras.layers.Add()([up, skip])
+
+        return out
+
+    @staticmethod
+    def _conv_block(inputs, filters):
+        x = tf.keras.layers.Conv2D(
+            filters,
+            kernel_size=3,
+            padding='same',
+            kernel_initializer='he_uniform'
+        )(inputs)
+
+        x = tf.keras.layers.BatchNormalization()(x)
+        x = tf.keras.layers.Activation('relu')(x)
+
+        x = tf.keras.layers.Conv2D(
+            filters,
+            kernel_size=3,
+            padding='same',
+            kernel_initializer='he_uniform'
+        )(x)
+
+        x = tf.keras.layers.BatchNormalization()(x)
+        x = tf.keras.layers.Activation('relu')(x)
+
+        x = tf.keras.layers.Conv2D(
+            filters,
+            kernel_size=3,
+            padding='same',
+            kernel_initializer='he_uniform'
+        )(x)
+
+        x = tf.keras.layers.BatchNormalization()(x)
+        x = tf.keras.layers.Activation('relu')(x)
+
+        x = tf.keras.layers.Conv2D(
+            filters,
+            kernel_size=3,
+            padding='same',
+            kernel_initializer='he_uniform'
+        )(x)
+
+        x = tf.keras.layers.BatchNormalization()(x)
+        x = tf.keras.layers.Activation('relu')(x)
+
+        return x
