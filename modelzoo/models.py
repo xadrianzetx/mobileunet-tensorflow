@@ -340,6 +340,17 @@ class MobileFPNet:
 
     def __call__(self):
         """
+        Creates instance of FPN Net with MobileNetV2 backbone.
+
+        based on:
+        https://arxiv.org/pdf/1612.03144.pdf
+        https://github.com/qubvel/segmentation_models/blob/master/segmentation_models/models/fpn.py
+
+        Net has been modified to fully compile
+        to Edge TPU with 192x192x3 input size.
+
+        :return:    tf.keras.models.Model
+                    FPN net instance
         """
         segname = 'block_{}_expand_relu'
         blocks = [13, 6, 3, 1]
@@ -373,24 +384,22 @@ class MobileFPNet:
 
         concat = [s5, s4, s3, s2]
         x = tf.keras.layers.Concatenate()(concat)
-        x = tf.keras.layers.SeparableConv2D(
-            128,
+        x = tf.keras.layers.Conv2D(
+            64,
             kernel_size=3,
             padding='same',
-            depthwise_initializer='he_uniform',
-            pointwise_initializer='he_uniform'
+            kernel_initializer='he_uniform'
         )(x)
 
         x = tf.keras.layers.BatchNormalization()(x)
         x = tf.keras.layers.Activation('relu')(x)
         x = tf.keras.layers.UpSampling2D((2, 2))(x)
 
-        x = tf.keras.layers.SeparableConv2D(
+        x = tf.keras.layers.Conv2D(
             1,
             kernel_size=3,
             padding='same',
-            depthwise_initializer='glorot_uniform',
-            pointwise_initializer='glorot_uniform'
+            kernel_initializer='he_uniform'
         )(x)
 
         out = tf.keras.layers.Activation('sigmoid')(x)
@@ -403,19 +412,16 @@ class MobileFPNet:
 
     @staticmethod
     def _fpn_block(inputs, skip):
-        inputs = tf.keras.layers.SeparableConv2D(
+        inputs = tf.keras.layers.Conv2D(
             256,
             kernel_size=1,
             padding='same',
-            depthwise_initializer='he_uniform',
-            pointwise_initializer='he_uniform'
-        )(inputs)
+            kernel_initializer='he_uniform'
 
         skip = tf.keras.layers.SeparableConv2D(
             256,
             kernel_size=1,
-            depthwise_initializer='he_uniform',
-            pointwise_initializer='he_uniform'
+            kernel_initializer='he_uniform'
         )(skip)
 
         up = tf.keras.layers.UpSampling2D((2, 2))(inputs)
@@ -425,23 +431,41 @@ class MobileFPNet:
 
     @staticmethod
     def _conv_block(inputs, filters):
-        x = tf.keras.layers.SeparableConv2D(
+        x = tf.keras.layers.Conv2D(
             filters,
             kernel_size=3,
             padding='same',
-            depthwise_initializer='he_uniform',
-            pointwise_initializer='he_uniform'
+            kernel_initializer='he_uniform'
         )(inputs)
 
         x = tf.keras.layers.BatchNormalization()(x)
         x = tf.keras.layers.Activation('relu')(x)
 
-        x = tf.keras.layers.SeparableConv2D(
+        x = tf.keras.layers.Conv2D(
             filters,
             kernel_size=3,
             padding='same',
-            depthwise_initializer='he_uniform',
-            pointwise_initializer='he_uniform'
+            kernel_initializer='he_uniform'
+        )(x)
+
+        x = tf.keras.layers.BatchNormalization()(x)
+        x = tf.keras.layers.Activation('relu')(x)
+
+        x = tf.keras.layers.Conv2D(
+            filters,
+            kernel_size=3,
+            padding='same',
+            kernel_initializer='he_uniform'
+        )(x)
+
+        x = tf.keras.layers.BatchNormalization()(x)
+        x = tf.keras.layers.Activation('relu')(x)
+
+        x = tf.keras.layers.Conv2D(
+            filters,
+            kernel_size=3,
+            padding='same',
+            kernel_initializer='he_uniform'
         )(x)
 
         x = tf.keras.layers.BatchNormalization()(x)
