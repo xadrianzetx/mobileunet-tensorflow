@@ -2,7 +2,7 @@ import os
 import json
 import yaml
 import tensorflow as tf
-from utils.dataset import NightRideImageGenerator
+from modules.dataset import NightRideImageGenerator
 from modelzoo.models import MobileUNet
 from modelzoo.losses import focal_tversky_loss
 from modelzoo.metrics import dice_coefficient
