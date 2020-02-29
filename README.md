@@ -43,9 +43,13 @@ docker run -d --gpus all -v $(pwd)/data:/app/data \
 ```
 Container has volume mapped to ```$(pwd)/data``` so make sure such path exists on your host. This directory should also contain training data. Baseline for this model was trained on [CU Lane Dataset](https://xingangpan.github.io/projects/CULane.html). Tensorboard files and json logs will be available at ```$(pwd)/data/logs```, model checkpoints and .h5 are saved to ```$(pwd)/data/models```.
 
-## Testing
+## Testing on CPU
 
 Run ```python test.py -m image -f ${IMG_PATH} -s ${SAVEPOINT}``` to test the model. You can pass ```-m image``` to run model on .jpg or ```-m video``` to run it on video feed. FlatBuffer model (.tflite) supported by passing ```--flatbuff```
+
+## Testing on TPU
+
+In order to test model on Coral USB Accelerator, [prepare local env](https://coral.ai/docs/accelerator/get-started) and make sure your model [has been compiled](https://colab.research.google.com/drive/1RnnffvT6wWuOB8UJYZ5TTS7rgyev8gDM), then run `python tpu_test.py -m ${MODEL_PATH} -v ${VIDEO_PATH}`
 
 # References
 * [Ronneberger et al., 2015, U-Net: Convolutional Networks for Biomedical Image Segmentation](https://arxiv.org/pdf/1505.04597.pdf)

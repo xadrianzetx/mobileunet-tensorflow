@@ -4,7 +4,7 @@ import json
 import numpy as np
 import pandas as pd
 from PIL import Image
-from utils.decoding import mask_from_splines
+from modules.decoding import mask_from_splines
 
 
 class CULaneImage:
