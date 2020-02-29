@@ -13,7 +13,6 @@ class TPUBenchTest:
     @property
     def input_size(self):
         _, *size, _ = self._interpreter.get_input_tensor_shape()
-
         return size
 
     @property
@@ -53,7 +52,7 @@ class TPUBenchTest:
 
         img *= (1 / 255)
         expd = np.expand_dims(img, axis=0)
-        quantized = (expd / std + mean)
+        quantized = expd / std + mean
 
         return quantized.astype(np.uint8)
 
