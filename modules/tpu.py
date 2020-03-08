@@ -3,6 +3,14 @@ import numpy as np
 from edgetpu.basic.basic_engine import BasicEngine
 
 
+class TPUParamDefaults:
+
+    QMEAN = 0
+    QSTD = 0.003921568859368563
+    DQMEAN = 0
+    DQSTD = 0.00390625
+
+
 class TPUBenchTest:
 
     def __init__(self, model, env='Windows'):

@@ -9,8 +9,14 @@ def parser():
 
     p.add_argument('-m', type=str)
     p.add_argument('-v', type=str)
-    p.add_argument('--quantstd', type=float, default=0.003921568859368563)
-    p.add_argument('--dequantstd', type=float, default=0.00390625)
+
+    # quantization mean and standard deviation
+    p.add_argument('--quantmean', type=int, default=tpu.TPUParamDefaults.QMEAN)
+    p.add_argument('--quantstd', type=float, default=tpu.TPUParamDefaults.QSTD)
+
+    # dequantization mean and standard deviation
+    p.add_argument('--dequantmean', type=int, default=tpu.TPUParamDefaults.DQMEAN)
+    p.add_argument('--dequantstd', type=float, default=tpu.TPUParamDefaults.DQSTD)
 
     return p.parse_args()
 
@@ -31,10 +37,16 @@ def main():
         frmcpy = frame.copy()
 
         # quantize model input, run inference and dequantize outputs
-        frame = runtime.preprocess(frame, mean=0, std=args.quantstd)
+        frame = runtime.preprocess(frame, mean=args.quantmean, std=args.quantstd)
         pred_obj = runtime.invoke(frame)
         print('[Inference time] {}ms'.format(runtime.inference_time))
-        pred = runtime.postprocess(pred_obj, frmcpy, mean=0, std=args.dequantstd)
+
+        pred = runtime.postprocess(
+            pred_obj=pred_obj,
+            frame=frmcpy,
+            mean=args.dequantmean,
+            std=args.dequantstd
+        )
 
         # resize output frame to fit foo
         out = cv2.resize(pred, (pred.shape[1] // 2, pred.shape[0] // 2))
