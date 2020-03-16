@@ -2,8 +2,8 @@ import os
 import json
 import yaml
 import tensorflow as tf
+import modelzoo.models as mm
 from modules.dataset import NightRideImageGenerator
-from modelzoo.models import MobileUNet
 from modelzoo.losses import focal_tversky_loss
 from modelzoo.metrics import dice_coefficient
 
@@ -26,22 +26,32 @@ def train():
         'checkpoint-name': os.environ['--checkpoint']
     }
 
+    models = {
+        'FastSCNN': mm.FastSCNN,
+        'MobileUNet': mm.MobileUNet,
+        'MobileFPNet': mm.MobileFPNet,
+        'DeepLabV3Plus': mm.DeepLabV3Plus
+    }
+
     with open('config.yaml', 'r') as file:
         config = yaml.load(file)
 
     if args['mode'] == 'train' or args['mode'] == 'debug':
         # new model instance
+        # TODO add additional options
         input_shape = tuple(config['shapes']['image'])
         train_enc = config['training']['train_encoder']
 
-        unet = MobileUNet(
-            mode='binary',
+        if config['model'] not in models.keys():
+            msg = 'Incorrect model specified. Options: {}'
+            raise KeyError(msg.format(models.keys()))
+
+        model_obj = models[config['model']](
             input_shape=input_shape,
-            train_encoder=train_enc,
-            weight_decay=True
+            train_encoder=train_enc
         )
 
-        model = unet.build()
+        model = model_obj()
 
     else:
         # resume training from checkpoint

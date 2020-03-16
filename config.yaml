@@ -1,3 +1,6 @@
+# model type
+model: 'MobileUNet'
+
 # paths
 paths:
   train: './data'
