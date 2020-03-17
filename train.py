@@ -46,6 +46,7 @@ def train():
             msg = 'Incorrect model specified. Options: {}'
             raise KeyError(msg.format(models.keys()))
 
+        # TODO unpack kwargs depending on model
         model_obj = models[config['model']](
             input_shape=input_shape,
             train_encoder=train_enc
