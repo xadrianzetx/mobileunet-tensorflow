@@ -666,6 +666,71 @@ class DeepLabV3Plus:
 
     def __init__(self, input_shape, **kwargs):
         self._input_shape = input_shape
+        self._trainable = kwargs.get('train_encoder', True)
+        self._alpha = kwargs.get('alpha', 1)
 
     def __call__(self, **kwargs):
+        """
+        Based on:
+        https://github.com/bonlime/keras-deeplab-v3-plus/blob/master/model.py
+        """
         pass
+
+    def _inverted_res_block(self, inputs, expansion, strides,
+                            filters, block_id, skip_connection, rate=1):
+        in_channels = inputs.shape[0]
+        pointwise_filters = int(filters * self._alpha)
+        pointwise_filters = DeepLabV3Plus._make_divisible(pointwise_filters, 8)
+        x = inputs
+
+        if block_id:
+            # Expand
+            x = tf.keras.layers.Conv2D(
+                in_channels * expansion,
+                kernel_size=1,
+                padding='same',
+                use_bias=False,
+                trainable=self._trainable
+            )(x)
+
+            x = tf.keras.layers.BatchNormalization()(x)
+            x = tf.keras.layers.ReLU(max_value=6)(x)
+
+        # Depthwise
+        x = tf.keras.layers.DepthwiseConv2D(
+            kernel_size=3,
+            strides=strides,
+            padding='same',
+            use_bias=False,
+            dilation_rate=(rate, rate),
+            trainable=self._trainable
+        )(x)
+
+        x = tf.keras.layers.BatchNormalization()(x)
+        x = tf.keras.layers.ReLU(max_value=6)(x)
+
+        # Project
+        x = tf.keras.layers.Conv2D(
+            pointwise_filters,
+            kernel_size=1,
+            padding='same',
+            use_bias=False,
+            trainable=False
+        )(x)
+
+        x = tf.keras.layers.BatchNormalization()(x)
+
+        if skip_connection:
+            x = tf.keras.layers.Add()([inputs, x])
+
+        return x
+
+    @staticmethod
+    def _make_divisible(v, divisor):
+        new_v = max(divisor, int(v + divisor / 2) // divisor * divisor)
+
+        # Make sure that round down does not go down by more than 10%.
+        if new_v < 0.9 * v:
+            new_v += divisor
+
+        return new_v
