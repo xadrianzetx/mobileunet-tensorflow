@@ -671,10 +671,186 @@ class DeepLabV3Plus:
 
     def __call__(self, **kwargs):
         """
-        Based on:
+        src:
         https://github.com/bonlime/keras-deeplab-v3-plus/blob/master/model.py
         """
-        pass
+        inputs = tf.keras.layers.Input(shape=self._input_shape)
+        ffilters = DeepLabV3Plus._make_divisible(32 * self._alpha, 8)
+
+        x = tf.keras.layers.Conv2D(
+            ffilters,
+            kernel_size=2,
+            padding='same',
+            use_bias=False
+        )(inputs)
+
+        x = tf.keras.layers.BatchNormalization()(x)
+        x = tf.keras.layers.ReLU(max_value=6)(x)
+
+        x = self._inverted_res_block(
+            x,
+            filters=16,
+            strides=1,
+            expansion=1,
+            block_id=0,
+            skip_connection=False
+        )
+
+        x = self._inverted_res_block(
+            x,
+            filters=24,
+            strides=2,
+            expansion=6,
+            block_id=1,
+            skip_connection=False
+        )
+
+        x = self._inverted_res_block(
+            x,
+            filters=24,
+            strides=1,
+            expansion=6,
+            block_id=2,
+            skip_connection=True
+        )
+
+        x = self._inverted_res_block(
+            x,
+            filters=32,
+            strides=2,
+            expansion=6,
+            block_id=3,
+            skip_connection=False
+        )
+
+        x = self._inverted_res_block(
+            x,
+            filters=32,
+            strides=1,
+            expansion=6,
+            block_id=4,
+            skip_connection=True
+        )
+
+        x = self._inverted_res_block(
+            x,
+            filters=32,
+            strides=1,
+            expansion=6,
+            block_id=5,
+            skip_connection=True
+        )
+
+        x = self._inverted_res_block(
+            x,
+            filters=64,
+            strides=1,
+            expansion=6,
+            block_id=6,
+            skip_connection=False
+        )
+
+        x = self._inverted_res_block(
+            x,
+            filters=64,
+            strides=1,
+            rate=2,
+            expansion=6,
+            block_id=7,
+            skip_connection=True
+        )
+
+        x = self._inverted_res_block(
+            x,
+            filters=64,
+            strides=1,
+            rate=2,
+            expansion=6,
+            block_id=8,
+            skip_connection=True
+        )
+
+        x = self._inverted_res_block(
+            x,
+            filters=64,
+            strides=1, rate=2,
+            expansion=6,
+            block_id=9,
+            skip_connection=True
+        )
+
+        x = self._inverted_res_block(
+            x,
+            filters=96,
+            strides=1,
+            rate=2,
+            expansion=6,
+            block_id=10,
+            skip_connection=False
+        )
+
+        x = self._inverted_res_block(
+            x,
+            filters=96,
+            strides=1,
+            rate=2,
+            expansion=6,
+            block_id=11,
+            skip_connection=True
+        )
+
+        x = self._inverted_res_block(
+            x,
+            filters=96,
+            strides=1,
+            rate=2,
+            expansion=6,
+            block_id=12,
+            skip_connection=True
+        )
+
+        x = self._inverted_res_block(
+            x,
+            filters=160,
+            strides=1,
+            rate=2,
+            expansion=6,
+            block_id=13,
+            skip_connection=False
+        )
+
+        x = self._inverted_res_block(
+            x,
+            filters=160,
+            strides=1,
+            rate=4,
+            expansion=6,
+            block_id=14,
+            skip_connection=True
+        )
+
+        x = self._inverted_res_block(
+            x,
+            filters=160,
+            strides=1,
+            rate=4,
+            expansion=6,
+            block_id=15,
+            skip_connection=True
+        )
+
+        x = self._inverted_res_block(
+            x,
+            filters=320,
+            strides=1,
+            rate=4,
+            expansion=6,
+            block_id=16,
+            skip_connection=False
+        )
+
+        # TODO
+        # deeplab decoder
 
     def _inverted_res_block(self, inputs, expansion, strides,
                             filters, block_id, skip_connection, rate=1):
