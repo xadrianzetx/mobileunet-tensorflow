@@ -696,6 +696,7 @@ class DeepLabV3Plus:
         sess = requests.Session()
         response = sess.get(url, params={'id': origin})
         open(fname, 'wb').write(response.content)
+        sess.close()
 
         return fname
 
