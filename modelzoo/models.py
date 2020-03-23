@@ -1,4 +1,6 @@
+import requests
 import tensorflow as tf
+import modelzoo.weights as wght
 
 
 class FastSCNN:
@@ -666,247 +668,48 @@ class DeepLabV3Plus:
 
     def __init__(self, input_shape, **kwargs):
         self._input_shape = input_shape
+        self._default_weights = wght.DeepLabV3PlusWeights.NAME_CS
         self._trainable = kwargs.get('train_encoder', True)
-        self._alpha = kwargs.get('alpha', 1)
+        self._weights = kwargs.get('weights', self._default_weights)
 
-    def __call__(self, **kwargs):
+    def __call__(self):
         """
-        src:
-        https://github.com/bonlime/keras-deeplab-v3-plus/blob/master/model.py
+        Pulls pretrained DeepLabV3+ from url
+
+        This is tf.keras implementation of
+        DeepLabV3+ by https://github.com/bonlime, kudos!
+
+        :return:    tf.keras.models.Model
+                    keras API model instance
         """
-        inputs = tf.keras.layers.Input(shape=self._input_shape)
-        ffilters = DeepLabV3Plus._make_divisible(32 * self._alpha, 8)
+        custom_obj = {'tf': tf, 'relu6': tf.nn.relu6}
+        wfile = self._get_model_weights()
+        model = tf.keras.models.load_model(wfile, custom_objects=custom_obj)
+        # TODO enable decoder freeze
 
-        x = tf.keras.layers.Conv2D(
-            ffilters,
-            kernel_size=2,
-            padding='same',
-            use_bias=False
-        )(inputs)
-
-        x = tf.keras.layers.BatchNormalization()(x)
-        x = tf.keras.layers.ReLU(max_value=6)(x)
-
-        x = self._inverted_res_block(
-            x,
-            filters=16,
-            strides=1,
-            expansion=1,
-            block_id=0,
-            skip_connection=False
-        )
-
-        x = self._inverted_res_block(
-            x,
-            filters=24,
-            strides=2,
-            expansion=6,
-            block_id=1,
-            skip_connection=False
-        )
-
-        x = self._inverted_res_block(
-            x,
-            filters=24,
-            strides=1,
-            expansion=6,
-            block_id=2,
-            skip_connection=True
-        )
-
-        x = self._inverted_res_block(
-            x,
-            filters=32,
-            strides=2,
-            expansion=6,
-            block_id=3,
-            skip_connection=False
-        )
-
-        x = self._inverted_res_block(
-            x,
-            filters=32,
-            strides=1,
-            expansion=6,
-            block_id=4,
-            skip_connection=True
-        )
-
-        x = self._inverted_res_block(
-            x,
-            filters=32,
-            strides=1,
-            expansion=6,
-            block_id=5,
-            skip_connection=True
-        )
-
-        x = self._inverted_res_block(
-            x,
-            filters=64,
-            strides=1,
-            expansion=6,
-            block_id=6,
-            skip_connection=False
-        )
-
-        x = self._inverted_res_block(
-            x,
-            filters=64,
-            strides=1,
-            rate=2,
-            expansion=6,
-            block_id=7,
-            skip_connection=True
-        )
-
-        x = self._inverted_res_block(
-            x,
-            filters=64,
-            strides=1,
-            rate=2,
-            expansion=6,
-            block_id=8,
-            skip_connection=True
-        )
-
-        x = self._inverted_res_block(
-            x,
-            filters=64,
-            strides=1, rate=2,
-            expansion=6,
-            block_id=9,
-            skip_connection=True
-        )
-
-        x = self._inverted_res_block(
-            x,
-            filters=96,
-            strides=1,
-            rate=2,
-            expansion=6,
-            block_id=10,
-            skip_connection=False
-        )
-
-        x = self._inverted_res_block(
-            x,
-            filters=96,
-            strides=1,
-            rate=2,
-            expansion=6,
-            block_id=11,
-            skip_connection=True
-        )
-
-        x = self._inverted_res_block(
-            x,
-            filters=96,
-            strides=1,
-            rate=2,
-            expansion=6,
-            block_id=12,
-            skip_connection=True
-        )
-
-        x = self._inverted_res_block(
-            x,
-            filters=160,
-            strides=1,
-            rate=2,
-            expansion=6,
-            block_id=13,
-            skip_connection=False
-        )
-
-        x = self._inverted_res_block(
-            x,
-            filters=160,
-            strides=1,
-            rate=4,
-            expansion=6,
-            block_id=14,
-            skip_connection=True
-        )
-
-        x = self._inverted_res_block(
-            x,
-            filters=160,
-            strides=1,
-            rate=4,
-            expansion=6,
-            block_id=15,
-            skip_connection=True
-        )
-
-        x = self._inverted_res_block(
-            x,
-            filters=320,
-            strides=1,
-            rate=4,
-            expansion=6,
-            block_id=16,
-            skip_connection=False
-        )
-
-        # TODO
-        # deeplab decoder
-
-    def _inverted_res_block(self, inputs, expansion, strides,
-                            filters, block_id, skip_connection, rate=1):
-        in_channels = inputs.shape[0]
-        pointwise_filters = int(filters * self._alpha)
-        pointwise_filters = DeepLabV3Plus._make_divisible(pointwise_filters, 8)
-        x = inputs
-
-        if block_id:
-            # Expand
-            x = tf.keras.layers.Conv2D(
-                in_channels * expansion,
-                kernel_size=1,
-                padding='same',
-                use_bias=False,
-                trainable=self._trainable
-            )(x)
-
-            x = tf.keras.layers.BatchNormalization()(x)
-            x = tf.keras.layers.ReLU(max_value=6)(x)
-
-        # Depthwise
-        x = tf.keras.layers.DepthwiseConv2D(
-            kernel_size=3,
-            strides=strides,
-            padding='same',
-            use_bias=False,
-            dilation_rate=(rate, rate),
-            trainable=self._trainable
-        )(x)
-
-        x = tf.keras.layers.BatchNormalization()(x)
-        x = tf.keras.layers.ReLU(max_value=6)(x)
-
-        # Project
-        x = tf.keras.layers.Conv2D(
-            pointwise_filters,
-            kernel_size=1,
-            padding='same',
-            use_bias=False,
-            trainable=False
-        )(x)
-
-        x = tf.keras.layers.BatchNormalization()(x)
-
-        if skip_connection:
-            x = tf.keras.layers.Add()([inputs, x])
-
-        return x
+        return model
 
     @staticmethod
-    def _make_divisible(v, divisor):
-        new_v = max(divisor, int(v + divisor / 2) // divisor * divisor)
+    def _get_file(fname, origin):
+        # pulls model from url and saves as .h5
+        url = 'https://docs.google.com/uc?export=download'
+        sess = requests.Session()
+        response = sess.get(url, params={'id': origin})
+        open(fname, 'wb').write(response.content)
 
-        # Make sure that round down does not go down by more than 10%.
-        if new_v < 0.9 * v:
-            new_v += divisor
+        return fname
 
-        return new_v
+    def _get_model_weights(self):
+        if self._input_shape[0] not in [192, 256, 512]:
+            raise ValueError('No model with this input shape')
+
+        if self._weights == wght.DeepLabV3PlusWeights.NAME_VOC:
+            params = wght.DeepLabV3PlusWeights.PARAM_VOC
+
+        elif self._weights == wght.DeepLabV3PlusWeights.NAME_CS:
+            params = wght.DeepLabV3PlusWeights.PARAM_CS
+
+        shape = str(self._input_shape[0])
+        wfile = DeepLabV3Plus._get_file(**params[shape])
+
+        return wfile
