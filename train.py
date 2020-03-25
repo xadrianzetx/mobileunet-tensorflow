@@ -37,30 +37,29 @@ def train():
         config = yaml.load(file)
 
     if args['mode'] == 'train' or args['mode'] == 'debug':
-        # new model instance
-        # TODO add additional options
         input_shape = tuple(config['shapes']['image'])
-        train_enc = config['training']['train_encoder']
+        model_name = config['model']['name']
 
-        if config['model'] not in models.keys():
+        if model_name not in models.keys():
             msg = 'Incorrect model specified. Options: {}'
             raise KeyError(msg.format(models.keys()))
 
-        # TODO unpack kwargs depending on model
-        model_obj = models[config['model']](
+        # get model architecture specified
+        # in config and build keras model
+        model = models[model_name](
             input_shape=input_shape,
-            train_encoder=train_enc
-        )
-
-        model = model_obj()
+            **config['model']
+        )()
 
     else:
         # resume training from checkpoint
         path = os.path.join(config['paths']['checkpoint'], args['checkpoint-name'])
 
         custom_obj = {
+            'tf': tf,
             'focal_tversky': focal_tversky_loss(alpha=0.7, beta=0.3, gamma=0.75),
-            'dice': dice_coefficient()
+            'dice': dice_coefficient(),
+            'relu6': tf.nn.relu6
         }
 
         # load from .h5 file
