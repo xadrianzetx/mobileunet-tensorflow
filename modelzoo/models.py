@@ -685,7 +685,12 @@ class DeepLabV3Plus:
         custom_obj = {'tf': tf, 'relu6': tf.nn.relu6}
         wfile = self._get_model_weights()
         model = tf.keras.models.load_model(wfile, custom_objects=custom_obj)
-        # TODO enable decoder freeze
+
+        if not self._trainable:
+            # freeze encoder layers up to
+            # expanded_conv_16_project_BN
+            for layer in model.layers[1:147]:
+                layer.trainable = False
 
         return model
 
@@ -705,9 +710,11 @@ class DeepLabV3Plus:
             raise ValueError('No model with this input shape')
 
         if self._weights == wght.DeepLabV3PlusWeights.NAME_VOC:
+            # Load model pretrained on pascal voc
             params = wght.DeepLabV3PlusWeights.PARAM_VOC
 
         elif self._weights == wght.DeepLabV3PlusWeights.NAME_CS:
+            # load model pretrained on cityscapes
             params = wght.DeepLabV3PlusWeights.PARAM_CS
 
         shape = str(self._input_shape[0])
