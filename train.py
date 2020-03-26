@@ -2,8 +2,8 @@ import os
 import json
 import yaml
 import tensorflow as tf
+import modelzoo.models as mm
 from modules.dataset import NightRideImageGenerator
-from modelzoo.models import MobileUNet
 from modelzoo.losses import focal_tversky_loss
 from modelzoo.metrics import dice_coefficient
 
@@ -26,30 +26,40 @@ def train():
         'checkpoint-name': os.environ['--checkpoint']
     }
 
+    models = {
+        'FastSCNN': mm.FastSCNN,
+        'MobileUNet': mm.MobileUNet,
+        'MobileFPNet': mm.MobileFPNet,
+        'DeepLabV3Plus': mm.DeepLabV3Plus
+    }
+
     with open('config.yaml', 'r') as file:
         config = yaml.load(file)
 
     if args['mode'] == 'train' or args['mode'] == 'debug':
-        # new model instance
         input_shape = tuple(config['shapes']['image'])
-        train_enc = config['training']['train_encoder']
+        model_name = config['model']['name']
 
-        unet = MobileUNet(
-            mode='binary',
+        if model_name not in models.keys():
+            msg = 'Incorrect model specified. Options: {}'
+            raise KeyError(msg.format(models.keys()))
+
+        # get model architecture specified
+        # in config and build keras model
+        model = models[model_name](
             input_shape=input_shape,
-            train_encoder=train_enc,
-            weight_decay=True
-        )
-
-        model = unet.build()
+            **config['model']
+        )()
 
     else:
         # resume training from checkpoint
         path = os.path.join(config['paths']['checkpoint'], args['checkpoint-name'])
 
         custom_obj = {
+            'tf': tf,
             'focal_tversky': focal_tversky_loss(alpha=0.7, beta=0.3, gamma=0.75),
-            'dice': dice_coefficient()
+            'dice': dice_coefficient(),
+            'relu6': tf.nn.relu6
         }
 
         # load from .h5 file

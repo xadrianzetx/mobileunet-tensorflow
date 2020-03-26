@@ -59,8 +59,16 @@ training:
   lr: 0.001
   epochs: 50
   debug_epochs: 2
-  train_encoder: True
   augmentations:
     - 'flip'
     - 'rotate'
   augment_proba: 0.4
+
+# model params
+model:
+  name: 'MobileUNet'
+  train_encoder: True
+  weights: 'cityscapes'
+  weight_decay: True
+  mode: 'binary'
+  n_classes: 1
